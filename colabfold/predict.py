@@ -73,12 +73,24 @@ def predict_structure(
         offset = i[:,None] - i[None,:]
         c_offset = np.abs(ij[:,None,:,None] - ij[None,:,None,:]).min((2,3))
         return np.sign(offset) * c_offset
+
+      # for complex residue_index
+      def index_extend(idx, binder_len, target_len, length=50):
+        idx[-binder_len:] = idx[-binder_len:] + idx[target_len - 1] + length
+        return idx
+
       if "multimer" in model_type:
         if model_num == 0 and seed_num == 0:
           input_features = feature_dict
           input_features["asym_id"] = input_features["asym_id"] - input_features["asym_id"][...,0]
           if cyclic:
-            input_features["offset"] = cyclic_offset(seq_len)
+            logger.info("mulitimer cyclic complex offset")
+            idx = input_features["residue_index"]
+            idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
+            offset = np.array(idx[:,None] - idx[None,:])
+            c_offset = cyclic_offset(sequences_lengths[1])
+            offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
+            input_features["offset"] = offset
 
           # TODO: add support for multimer padding
           # if seq_len < pad_len:
@@ -91,12 +103,17 @@ def predict_structure(
           batch_size = input_features["aatype"].shape[0]
           input_features["asym_id"] = np.tile(feature_dict["asym_id"][None],(batch_size,1))          
           if cyclic:
-            input_features["offset"] = np.tile(cyclic_offset(seq_len)[None],(batch_size,1,1))
-          
-          if seq_len < pad_len:
-            input_features = pad_input(input_features, model_runner, model_name, pad_len, use_templates)
-            logger.info(f"Padding length to {pad_len}")
-            
+            if is_complex:
+              logger.info("cyclic complex offset")
+              idx = input_features["residue_index"][0]
+              idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
+              offset = np.array(idx[:,None] - idx[None,:])
+              c_offset = cyclic_offset(sequences_lengths[1])
+              offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
+              input_features["offset"] = np.tile(offset[None],(batch_size,1,1))
+            else:
+              print("default cyclic offset")
+              input_features["offset"] = np.tile(cyclic_offset(seq_len)[None],(batch_size,1,1))
 
       tag = f"{model_type}_{model_name}_seed_{seed:03d}"
       model_names.append(tag)
