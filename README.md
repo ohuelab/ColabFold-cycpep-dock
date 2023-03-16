@@ -12,4 +12,4 @@ Link to ["main"](https://github.com/sokrypton/ColabFold) branch.
 
 | Notebooks | monomers | complexes | mmseqs2 | jackhmmer | templates   |
 | :-------- | -------  | --------- | ------- | --------- | ----------- |
-| [AlphaFold2-CycPepDocking](https://github.com/ohuelab/ColabFold-cycpep-dock/blob/cyclic_peptide_complex/AlphaFold2.ipynb) | Yes | Yes | Yes | No | Yes | 
+| [AlphaFold2-CycPepDocking](https://colab.research.google.com/github/ohuelab/ColabFold-cycpep-dock/blob/cyclic_peptide_complex/AlphaFold2.ipynb) | Yes | Yes | Yes | No | Yes | 
