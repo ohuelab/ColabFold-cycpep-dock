@@ -403,19 +403,19 @@ def predict_structure(
                 if model_num == 0 and seed_num == 0:
                     input_features = feature_dict
                     input_features["asym_id"] = input_features["asym_id"] - input_features["asym_id"][...,0]
-                if cyclic:
-                    logger.info("mulitimer cyclic complex offset")
-                    idx = input_features["residue_index"]
-                    idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
-                    offset = np.array(idx[:,None] - idx[None,:])
-                    c_offset = cyclic_offset(sequences_lengths[1])
-                    offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
-                    input_features["offset"] = offset
+                    if cyclic:
+                        logger.info("mulitimer cyclic complex offset")
+                        idx = input_features["residue_index"]
+                        idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
+                        offset = np.array(idx[:,None] - idx[None,:])
+                        c_offset = cyclic_offset(sequences_lengths[1])
+                        offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
+                        input_features["offset"] = offset
 
-                # TODO: add support for multimer padding
-                # if seq_len < pad_len:
-                #   input_features = pad_input_multimer(input_features, model_runner, model_name, pad_len, use_templates)
-                #   logger.info(f"Padding length to {pad_len}")
+                    # TODO: add support for multimer padding
+                    # if seq_len < pad_len:
+                    #   input_features = pad_input_multimer(input_features, model_runner, model_name, pad_len, use_templates)
+                    #   logger.info(f"Padding length to {pad_len}")
 
             else:
                 if model_num == 0:
@@ -1359,6 +1359,7 @@ def run(
         "use_fuse": use_fuse,
         "use_bfloat16":use_bfloat16,
         "version": importlib_metadata.version("colabfold"),
+        "cyclic":cyclic,
     }
     config_out_file = result_dir.joinpath("config.json")
     config_out_file.write_text(json.dumps(config, indent=4))
