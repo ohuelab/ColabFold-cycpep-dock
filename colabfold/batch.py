@@ -363,6 +363,7 @@ def predict_structure(
     save_single_representations: bool = False,
     save_pair_representations: bool = False,
     save_recycles: bool = False,
+    cyclic: bool = False
 ):
     """Predicts structure using AlphaFold for the given sequence."""
 
@@ -386,20 +387,53 @@ def predict_structure(
             #########################
             # process input features
             #########################
+            def cyclic_offset(L):
+                i = np.arange(L)
+                ij = np.stack([i,i+L],-1)
+                offset = i[:,None] - i[None,:]
+                c_offset = np.abs(ij[:,None,:,None] - ij[None,:,None,:]).min((2,3))
+                return np.sign(offset) * c_offset
+
+            # for complex residue_index
+            def index_extend(idx, binder_len, target_len, length=50):
+                idx[-binder_len:] = idx[-binder_len:] + idx[target_len - 1] + length
+                return idx
+
             if "multimer" in model_type:
                 if model_num == 0 and seed_num == 0:
-                    # TODO: add pad_input_mulitmer()
                     input_features = feature_dict
                     input_features["asym_id"] = input_features["asym_id"] - input_features["asym_id"][...,0]
+                if cyclic:
+                    logger.info("mulitimer cyclic complex offset")
+                    idx = input_features["residue_index"]
+                    idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
+                    offset = np.array(idx[:,None] - idx[None,:])
+                    c_offset = cyclic_offset(sequences_lengths[1])
+                    offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
+                    input_features["offset"] = offset
+
+                # TODO: add support for multimer padding
+                # if seq_len < pad_len:
+                #   input_features = pad_input_multimer(input_features, model_runner, model_name, pad_len, use_templates)
+                #   logger.info(f"Padding length to {pad_len}")
+
             else:
                 if model_num == 0:
                     input_features = model_runner.process_features(feature_dict, random_seed=seed)            
-                    r = input_features["aatype"].shape[0]
-                    input_features["asym_id"] = np.tile(feature_dict["asym_id"],r).reshape(r,-1)
-                    if seq_len < pad_len:
-                        input_features = pad_input(input_features, model_runner, 
-                            model_name, pad_len, use_templates)
-                        logger.info(f"Padding length to {pad_len}")
+                    batch_size = input_features["aatype"].shape[0]
+                    input_features["asym_id"] = np.tile(feature_dict["asym_id"][None],(batch_size,1))
+                    if cyclic:
+                        if is_complex:
+                            logger.info("cyclic complex offset")
+                            idx = input_features["residue_index"][0]
+                            idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
+                            offset = np.array(idx[:,None] - idx[None,:])
+                            c_offset = cyclic_offset(sequences_lengths[1])
+                            offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
+                            input_features["offset"] = np.tile(offset[None],(batch_size,1,1))
+                        else:
+                            print("default cyclic offset")
+                            input_features["offset"] = np.tile(cyclic_offset(seq_len)[None],(batch_size,1,1))
             
 
             tag = f"{model_type}_{model_name}_seed_{seed:03d}"
@@ -1737,6 +1771,7 @@ def main():
         action="store_true",
         help="if you are getting tensorflow/jax errors it might help to disable this",
     )
+    parser.add_argument("--cyclic", default=False, action="store_true")
 
     args = parser.parse_args()
     
@@ -1808,6 +1843,7 @@ def main():
         use_gpu_relax = args.use_gpu_relax,
         save_all=args.save_all,
         save_recycles=args.save_recycles,
+        cyclic=args.cyclic,
     )
 
 if __name__ == "__main__":
