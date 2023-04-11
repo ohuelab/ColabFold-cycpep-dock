@@ -1229,6 +1229,7 @@ def run(
     max_extra_seq: Optional[int] = None,
     use_cluster_profile: bool = True,
     feature_dict_callback: Callable[[Any], Any] = None,
+    cyclic: bool = False,
     **kwargs
 ):
     # check what device is available
@@ -1507,6 +1508,7 @@ def run(
                 save_single_representations=save_single_representations,
                 save_pair_representations=save_pair_representations,
                 save_recycles=save_recycles,
+                cyclic=cyclic,
             )
             result_files = results["result_files"]
             ranks.append(results["rank"])
