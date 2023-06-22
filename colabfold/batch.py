@@ -363,7 +363,8 @@ def predict_structure(
     save_single_representations: bool = False,
     save_pair_representations: bool = False,
     save_recycles: bool = False,
-    cyclic: bool = False
+    cyclic: bool = False,
+    bugfix: bool = False,
 ):
     """Predicts structure using AlphaFold for the given sequence."""
 
@@ -387,11 +388,14 @@ def predict_structure(
             #########################
             # process input features
             #########################
-            def cyclic_offset(L):
+            def cyclic_offset(L, bugfix=False):
                 i = np.arange(L)
                 ij = np.stack([i,i+L],-1)
                 offset = i[:,None] - i[None,:]
                 c_offset = np.abs(ij[:,None,:,None] - ij[None,:,None,:]).min((2,3))
+                if bugfix:
+                    a = c_offset < np.abs(offset)
+                    c_offset[a] = -c_offset[a]
                 return np.sign(offset) * c_offset
 
             # for complex residue_index
@@ -404,7 +408,10 @@ def predict_structure(
                     input_features = feature_dict
                     input_features["asym_id"] = input_features["asym_id"] - input_features["asym_id"][...,0]
                     if cyclic:
-                        logger.info("mulitimer cyclic complex offset")
+                        if bugfix:
+                            logger.info("bugfix mulitimer cyclic complex offset")
+                        else:
+                            logger.info("mulitimer cyclic complex offset")
                         idx = input_features["residue_index"]
                         idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
                         offset = np.array(idx[:,None] - idx[None,:])
@@ -424,7 +431,10 @@ def predict_structure(
                     input_features["asym_id"] = np.tile(feature_dict["asym_id"][None],(batch_size,1))
                     if cyclic:
                         if is_complex:
-                            logger.info("cyclic complex offset")
+                            if bugfix:
+                                logger.info("bugfix cyclic complex offset")
+                            else:
+                                logger.info("cyclic complex offset")
                             idx = input_features["residue_index"][0]
                             idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
                             offset = np.array(idx[:,None] - idx[None,:])
@@ -432,7 +442,10 @@ def predict_structure(
                             offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
                             input_features["offset"] = np.tile(offset[None],(batch_size,1,1))
                         else:
-                            print("default cyclic offset")
+                            if bugfix:
+                                logger.info("bugfix default cyclic offset")
+                            else:
+                                logger.info("default cyclic offset")
                             input_features["offset"] = np.tile(cyclic_offset(seq_len)[None],(batch_size,1,1))
             
 
@@ -1230,6 +1243,7 @@ def run(
     use_cluster_profile: bool = True,
     feature_dict_callback: Callable[[Any], Any] = None,
     cyclic: bool = False,
+    bugfix: bool = False,
     **kwargs
 ):
     # check what device is available
@@ -1360,6 +1374,7 @@ def run(
         "use_bfloat16":use_bfloat16,
         "version": importlib_metadata.version("colabfold"),
         "cyclic":cyclic,
+        "bugfix":bugfix,
     }
     config_out_file = result_dir.joinpath("config.json")
     config_out_file.write_text(json.dumps(config, indent=4))
@@ -1510,6 +1525,7 @@ def run(
                 save_pair_representations=save_pair_representations,
                 save_recycles=save_recycles,
                 cyclic=cyclic,
+                bugfix=bugfix,
             )
             result_files = results["result_files"]
             ranks.append(results["rank"])
@@ -1775,6 +1791,7 @@ def main():
         help="if you are getting tensorflow/jax errors it might help to disable this",
     )
     parser.add_argument("--cyclic", default=False, action="store_true")
+    parser.add_argument("--bugfix", default=False, action="store_true")
 
     args = parser.parse_args()
     
@@ -1847,6 +1864,7 @@ def main():
         save_all=args.save_all,
         save_recycles=args.save_recycles,
         cyclic=args.cyclic,
+        bugfix=args.bugfix,
     )
 
 if __name__ == "__main__":
