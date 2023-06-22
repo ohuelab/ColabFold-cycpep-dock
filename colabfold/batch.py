@@ -388,12 +388,12 @@ def predict_structure(
             #########################
             # process input features
             #########################
-            def cyclic_offset(L, bugfix=False):
+            def cyclic_offset(L, bug_fix=False):
                 i = np.arange(L)
                 ij = np.stack([i,i+L],-1)
                 offset = i[:,None] - i[None,:]
                 c_offset = np.abs(ij[:,None,:,None] - ij[None,:,None,:]).min((2,3))
-                if bugfix:
+                if bug_fix:
                     a = c_offset < np.abs(offset)
                     c_offset[a] = -c_offset[a]
                 return np.sign(offset) * c_offset
@@ -408,14 +408,16 @@ def predict_structure(
                     input_features = feature_dict
                     input_features["asym_id"] = input_features["asym_id"] - input_features["asym_id"][...,0]
                     if cyclic:
-                        if bugfix:
-                            logger.info("bugfix mulitimer cyclic complex offset")
-                        else:
-                            logger.info("mulitimer cyclic complex offset")
                         idx = input_features["residue_index"]
                         idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
                         offset = np.array(idx[:,None] - idx[None,:])
-                        c_offset = cyclic_offset(sequences_lengths[1])
+                        if bugfix:
+                            logger.info("bugfix mulitimer cyclic complex offset")
+                            c_offset = cyclic_offset(sequences_lengths[1], bug_fix=bugfix)
+                        else:
+                            logger.info("mulitimer cyclic complex offset")
+                            c_offset = cyclic_offset(sequences_lengths[1])
+                        logger.info(c_offset)
                         offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
                         input_features["offset"] = offset
 
@@ -431,22 +433,27 @@ def predict_structure(
                     input_features["asym_id"] = np.tile(feature_dict["asym_id"][None],(batch_size,1))
                     if cyclic:
                         if is_complex:
-                            if bugfix:
-                                logger.info("bugfix cyclic complex offset")
-                            else:
-                                logger.info("cyclic complex offset")
                             idx = input_features["residue_index"][0]
                             idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
                             offset = np.array(idx[:,None] - idx[None,:])
-                            c_offset = cyclic_offset(sequences_lengths[1])
+                            if bugfix:
+                                logger.info("bugfix cyclic complex offset")
+                                c_offset = cyclic_offset(sequences_lengths[1], bug_fix=bugfix)
+                            else:
+                                logger.info("cyclic complex offset")
+                                c_offset = cyclic_offset(sequences_lengths[1])
+                            logger.info(c_offset)
                             offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
                             input_features["offset"] = np.tile(offset[None],(batch_size,1,1))
                         else:
                             if bugfix:
                                 logger.info("bugfix default cyclic offset")
+                                input_features["offset"] = np.tile(cyclic_offset(seq_len, bug_fix=bugfix)[None],(batch_size,1,1))
+                                logger.info(cyclic_offset(seq_len, bug_fix=bugfix))
                             else:
                                 logger.info("default cyclic offset")
-                            input_features["offset"] = np.tile(cyclic_offset(seq_len)[None],(batch_size,1,1))
+                                input_features["offset"] = np.tile(cyclic_offset(seq_len)[None],(batch_size,1,1))
+                                logger.info(cyclic_offset(seq_len))
             
 
             tag = f"{model_type}_{model_name}_seed_{seed:03d}"
