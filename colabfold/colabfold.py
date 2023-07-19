@@ -67,7 +67,7 @@ def clear_mem(device="gpu"):
 TQDM_BAR_FORMAT = '{l_bar}{bar}| {n_fmt}/{total_fmt} [elapsed: {elapsed} remaining: {remaining}]'
 
 def run_mmseqs2(x, prefix, use_env=True, use_filter=True,
-                use_templates=False, filter=None, use_pairing=False,
+                use_templates=False, filter=None, use_pairing=False, pairing_strategy="greedy",
                 host_url="https://api.colabfold.com") -> Tuple[List[str], List[str]]:
   submission_endpoint = "ticket/pair" if use_pairing else "ticket/msa"
 
@@ -160,9 +160,14 @@ def run_mmseqs2(x, prefix, use_env=True, use_filter=True,
     mode = "env-nofilter" if use_env else "nofilter"
 
   if use_pairing:
-    mode = ""
     use_templates = False
     use_env = False
+    mode = ""
+    # greedy is default, complete was the previous behavior
+    if pairing_strategy == "greedy":
+      mode = "pairgreedy"
+    elif pairing_strategy == "complete":
+      mode = "paircomplete"
 
   # define path
   path = f"{prefix}_{mode}"
@@ -501,7 +506,7 @@ def plot_msas(msa, ori_seq=None, sort_by_seqid=True, deduplicate=True, dpi=100, 
     qid_ = msa_ == np.array(list("".join(seqs)))
     gapid = np.stack([gap_[:,Ln[i]:Ln[i+1]].max(-1) for i in range(len(seqs))],-1)
     seqid = np.stack([qid_[:,Ln[i]:Ln[i+1]].mean(-1) for i in range(len(seqs))],-1).sum(-1) / (gapid.sum(-1) + 1e-8)
-    non_gaps = gap_.astype(np.float)
+    non_gaps = gap_.astype(float)
     non_gaps[non_gaps == 0] = np.nan
     if sort_by_seqid:
       lines.append(non_gaps[seqid.argsort()]*seqid[seqid.argsort(),None])
@@ -697,7 +702,7 @@ def plot_pseudo_3D(xyz, c=None, ax=None, chainbreak=5,
   
   if chainbreak is not None:
     dist = np.linalg.norm(xyz[:-1] - xyz[1:], axis=-1)
-    colors[...,3] = (dist < chainbreak).astype(np.float)
+    colors[...,3] = (dist < chainbreak).astype(float)
 
   # add shade/tint based on z-dimension
   z = rescale(seg_z,zmin,zmax)[:,None]
