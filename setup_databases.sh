@@ -43,11 +43,20 @@ downloadFile() {
     fail "Could not download $URL to $OUTPUT"
 }
 
+# Make MMseqs2 merge the databases to avoid spamming the folder with files
+export MMSEQS_FORCE_MERGE=1
+
 if [ ! -f UNIREF30_READY ]; then
   downloadFile "https://wwwuser.gwdg.de/~compbiol/colabfold/uniref30_2202.tar.gz" "uniref30_2202.tar.gz"
   tar xzvf "uniref30_2202.tar.gz"
   mmseqs tsv2exprofiledb "uniref30_2202" "uniref30_2202_db"
   mmseqs createindex "uniref30_2202_db" tmp1 --remove-tmp-files 1
+  if [ -e uniref30_2202_db_mapping ]; then
+    ln -sf uniref30_2202_db_mapping uniref30_2202_db.idx_mapping
+  fi
+  if [ -e uniref30_2202_db_taxonomy ]; then
+    ln -sf uniref30_2202_db_taxonomy uniref30_2202_db.idx_taxonomy
+  fi
   touch UNIREF30_READY
 fi
 

@@ -67,55 +67,13 @@ from colabfold.utils import (
 )
 
 from Bio.PDB import MMCIFParser, PDBParser, MMCIF2Dict
+from Bio.PDB.PDBIO import Select
 
 # logging settings
 logger = logging.getLogger(__name__)
 import jax
 import jax.numpy as jnp
 logging.getLogger('jax._src.lib.xla_bridge').addFilter(lambda _: False)
-
-def patch_openmm():
-    from simtk.openmm import app
-    from simtk.unit import nanometers, sqrt
-
-    # applied https://raw.githubusercontent.com/deepmind/alphafold/main/docker/openmm.patch
-    # to OpenMM 7.5.1 (see PR https://github.com/openmm/openmm/pull/3203)
-    # patch is licensed under CC-0
-    # OpenMM is licensed under MIT and LGPL
-    # fmt: off
-    def createDisulfideBonds(self, positions):
-        def isCyx(res):
-            names = [atom.name for atom in res._atoms]
-            return 'SG' in names and 'HG' not in names
-        # This function is used to prevent multiple di-sulfide bonds from being
-        # assigned to a given atom.
-        def isDisulfideBonded(atom):
-            for b in self._bonds:
-                if (atom in b and b[0].name == 'SG' and
-                    b[1].name == 'SG'):
-                    return True
-
-            return False
-
-        cyx = [res for res in self.residues() if res.name == 'CYS' and isCyx(res)]
-        atomNames = [[atom.name for atom in res._atoms] for res in cyx]
-        for i in range(len(cyx)):
-            sg1 = cyx[i]._atoms[atomNames[i].index('SG')]
-            pos1 = positions[sg1.index]
-            candidate_distance, candidate_atom = 0.3*nanometers, None
-            for j in range(i):
-                sg2 = cyx[j]._atoms[atomNames[j].index('SG')]
-                pos2 = positions[sg2.index]
-                delta = [x-y for (x,y) in zip(pos1, pos2)]
-                distance = sqrt(delta[0]*delta[0] + delta[1]*delta[1] + delta[2]*delta[2])
-                if distance < candidate_distance and not isDisulfideBonded(sg2):
-                    candidate_distance = distance
-                    candidate_atom = sg2
-            # Assign bond to closest pair.
-            if candidate_atom:
-                self.addBond(sg1, candidate_atom)
-    # fmt: on
-    app.Topology.createDisulfideBonds = createDisulfideBonds
 
 def mk_mock_template(
     query_sequence: Union[List[str], str], num_temp: int = 1
@@ -198,6 +156,39 @@ def validate_and_fix_mmcif(cif_file: Path):
         with open(cif_file, "a") as f:
             f.write(CIF_REVISION_DATE)
 
+modified_mapping = {
+  "MSE" : "MET", "MLY" : "LYS", "FME" : "MET", "HYP" : "PRO",
+  "TPO" : "THR", "CSO" : "CYS", "SEP" : "SER", "M3L" : "LYS",
+  "HSK" : "HIS", "SAC" : "SER", "PCA" : "GLU", "DAL" : "ALA",
+  "CME" : "CYS", "CSD" : "CYS", "OCS" : "CYS", "DPR" : "PRO",
+  "B3K" : "LYS", "ALY" : "LYS", "YCM" : "CYS", "MLZ" : "LYS",
+  "4BF" : "TYR", "KCX" : "LYS", "B3E" : "GLU", "B3D" : "ASP",
+  "HZP" : "PRO", "CSX" : "CYS", "BAL" : "ALA", "HIC" : "HIS",
+  "DBZ" : "ALA", "DCY" : "CYS", "DVA" : "VAL", "NLE" : "LEU",
+  "SMC" : "CYS", "AGM" : "ARG", "B3A" : "ALA", "DAS" : "ASP",
+  "DLY" : "LYS", "DSN" : "SER", "DTH" : "THR", "GL3" : "GLY",
+  "HY3" : "PRO", "LLP" : "LYS", "MGN" : "GLN", "MHS" : "HIS",
+  "TRQ" : "TRP", "B3Y" : "TYR", "PHI" : "PHE", "PTR" : "TYR",
+  "TYS" : "TYR", "IAS" : "ASP", "GPL" : "LYS", "KYN" : "TRP",
+  "CSD" : "CYS", "SEC" : "CYS"
+}
+
+class ReplaceOrRemoveHetatmSelect(Select):
+  def accept_residue(self, residue):
+    hetfield, _, _ = residue.get_id()
+    if hetfield != " ":
+      if residue.resname in modified_mapping:
+        # set unmodified resname
+        residue.resname = modified_mapping[residue.resname]
+        # clear hetatm flag
+        residue._id = (" ", residue._id[1], " ")
+        t = residue.full_id
+        residue.full_id = (t[0], t[1], t[2], residue._id)
+        return 1
+      return 0
+    else:
+      return 1
+
 def convert_pdb_to_mmcif(pdb_file: Path):
     """convert existing pdb files into mmcif with the required poly_seq and revision_date"""
     i = pdb_file.stem
@@ -208,7 +199,7 @@ def convert_pdb_to_mmcif(pdb_file: Path):
     structure = parser.get_structure(i, pdb_file)
     cif_io = CFMMCIFIO()
     cif_io.set_structure(structure)
-    cif_io.save(str(cif_file))
+    cif_io.save(str(cif_file), ReplaceOrRemoveHetatmSelect())
 
 def mk_hhsearch_db(template_dir: str):
     template_path = Path(template_dir)
@@ -305,15 +296,14 @@ def pad_input(
 
 def relax_me(pdb_filename=None, pdb_lines=None, pdb_obj=None, use_gpu=False):
     if "relax" not in dir():
-        patch_openmm()
         from alphafold.common import residue_constants
         from alphafold.relax import relax
 
-    if pdb_obj is None:        
+    if pdb_obj is None:
         if pdb_lines is None:
             pdb_lines = Path(pdb_filename).read_text()
         pdb_obj = protein.from_pdb_string(pdb_lines)
-    
+
     amber_relaxer = relax.AmberRelaxation(
         max_iterations=0,
         tolerance=2.39,
@@ -321,7 +311,7 @@ def relax_me(pdb_filename=None, pdb_lines=None, pdb_obj=None, use_gpu=False):
         exclude_residues=[],
         max_outer_iterations=3,
         use_gpu=use_gpu)
-    
+
     relaxed_pdb_lines, _, _ = amber_relaxer.process(prot=pdb_obj)
     return relaxed_pdb_lines
 
@@ -331,7 +321,7 @@ class file_manager:
         self.result_dir = result_dir
         self.tag = None
         self.files = {}
-    
+
     def get(self, x: str, ext:str) -> Path:
         if self.tag not in self.files:
             self.files[self.tag] = []
@@ -378,13 +368,13 @@ def predict_structure(
 
     # iterate through random seeds
     for seed_num, seed in enumerate(range(random_seed, random_seed+num_seeds)):
-        
+
         # iterate through models
         for model_num, (model_name, model_runner, params) in enumerate(model_runner_and_params):
-            
+
             # swap params to avoid recompiling
             model_runner.params = params
-            
+
             #########################
             # process input features
             #########################
@@ -428,9 +418,13 @@ def predict_structure(
 
             else:
                 if model_num == 0:
-                    input_features = model_runner.process_features(feature_dict, random_seed=seed)            
-                    batch_size = input_features["aatype"].shape[0]
-                    input_features["asym_id"] = np.tile(feature_dict["asym_id"][None],(batch_size,1))
+                    input_features = model_runner.process_features(feature_dict, random_seed=seed)
+                    r = input_features["aatype"].shape[0]
+                    input_features["asym_id"] = np.tile(feature_dict["asym_id"],r).reshape(r,-1)
+                    if seq_len < pad_len:
+                        input_features = pad_input(input_features, model_runner,
+                            model_name, pad_len, use_templates)
+                        logger.info(f"Padding length to {pad_len}")
                     if cyclic:
                         if is_complex:
                             idx = input_features["residue_index"][0]
@@ -454,17 +448,17 @@ def predict_structure(
                                 logger.info("default cyclic offset")
                                 input_features["offset"] = np.tile(cyclic_offset(seq_len)[None],(batch_size,1,1))
                                 logger.info(cyclic_offset(seq_len))
-            
+
 
             tag = f"{model_type}_{model_name}_seed_{seed:03d}"
             model_names.append(tag)
             files.set_tag(tag)
-            
+
             ########################
             # predict
             ########################
             start = time.time()
-            
+
             # monitor intermediate results
             def callback(result, recycles):
                 if recycles == 0: result.pop("tol",None)
@@ -483,12 +477,12 @@ def predict_structure(
                         result=result, b_factors=b_factors,
                         remove_leading_feature_dimension=("multimer" not in model_type))
                     files.get("unrelaxed",f"r{recycles}.pdb").write_text(protein.to_pdb(unrelaxed_protein))
-                
+
                     if save_all:
                         with files.get("all",f"r{recycles}.pickle").open("wb") as handle:
                             pickle.dump(result, handle)
                     del unrelaxed_protein
-            
+
             return_representations = save_all or save_single_representations or save_pair_representations
 
             # predict
@@ -503,9 +497,9 @@ def predict_structure(
             ########################
             # parse results
             ########################
-            
+
             # summary metrics
-            mean_scores.append(result["ranking_confidence"])         
+            mean_scores.append(result["ranking_confidence"])
             if recycles == 0: result.pop("tol",None)
             if not is_complex: result.pop("iptm",None)
             print_line = ""
@@ -533,7 +527,7 @@ def predict_structure(
 
             #########################
             # save results
-            #########################      
+            #########################
 
             # save pdb
             protein_lines = protein.to_pdb(unrelaxed_protein)
@@ -562,12 +556,12 @@ def predict_structure(
                   del pae
                 del plddt
                 json.dump(scores, handle)
-            
+
             del result, unrelaxed_protein
 
             # early stop criteria fulfilled
             if mean_scores[-1] > stop_at_score: break
-        
+
         # early stop criteria fulfilled
         if mean_scores[-1] > stop_at_score: break
 
@@ -578,7 +572,7 @@ def predict_structure(
     ###################################################
     # rerank models based on predicted confidence
     ###################################################
-    
+
     rank, metric = [],[]
     result_files = []
     logger.info(f"reranking models by '{rank_by}' metric")
@@ -591,7 +585,7 @@ def predict_structure(
         if n < num_relax:
             start = time.time()
             pdb_lines = relax_me(pdb_lines=unrelaxed_pdb_lines[key], use_gpu=use_gpu_relax)
-            files.get("relaxed","pdb").write_text(pdb_lines)            
+            files.get("relaxed","pdb").write_text(pdb_lines)
             logger.info(f"Relaxation took {(time.time() - start):.1f}s")
 
         # rename files to include rank
@@ -602,7 +596,7 @@ def predict_structure(
             new_file = result_dir.joinpath(f"{prefix}_{x}_{new_tag}.{ext}")
             file.rename(new_file)
             result_files.append(new_file)
-        
+
     return {"rank":rank,
             "metric":metric,
             "result_files":result_files}
@@ -713,10 +707,10 @@ def get_queries(
     # sort by seq. len
     if sort_queries_by == "length":
         queries.sort(key=lambda t: len("".join(t[1])))
-    
+
     elif sort_queries_by == "random":
         random.shuffle(queries)
-    
+
     is_complex = False
     for job_number, (raw_jobname, query_sequence, a3m_lines) in enumerate(queries):
         if isinstance(query_sequence, list):
@@ -783,11 +777,13 @@ def pad_sequences(
 def get_msa_and_templates(
     jobname: str,
     query_sequences: Union[str, List[str]],
+    a3m_lines: Optional[List[str]],
     result_dir: Path,
     msa_mode: str,
     use_templates: bool,
     custom_template_path: str,
     pair_mode: str,
+    pairing_strategy: str = "greedy",
     host_url: str = DEFAULT_API_SERVER,
 ) -> Tuple[
     Optional[List[str]], Optional[List[str]], List[str], List[int], List[Dict[str, Any]]
@@ -812,17 +808,29 @@ def get_msa_and_templates(
     # get template features
     template_features = []
     if use_templates:
-        a3m_lines_mmseqs2, template_paths = run_mmseqs2(
-            query_seqs_unique,
-            str(result_dir.joinpath(jobname)),
-            use_env,
-            use_templates=True,
-            host_url=host_url,
-        )
+        # Skip template search when custom_template_path is provided
         if custom_template_path is not None:
+            if a3m_lines is None:
+                a3m_lines_mmseqs2 = run_mmseqs2(
+                    query_seqs_unique,
+                    str(result_dir.joinpath(jobname)),
+                    use_env,
+                    use_templates=False,
+                    host_url=host_url,
+                )
+            else:
+                a3m_lines_mmseqs2 = a3m_lines
             template_paths = {}
             for index in range(0, len(query_seqs_unique)):
                 template_paths[index] = custom_template_path
+        else:
+            a3m_lines_mmseqs2, template_paths = run_mmseqs2(
+                query_seqs_unique,
+                str(result_dir.joinpath(jobname)),
+                use_env,
+                use_templates=True,
+                host_url=host_url,
+            )
         if template_paths is None:
             logger.info("No template detected")
             for index in range(0, len(query_seqs_unique)):
@@ -884,6 +892,7 @@ def get_msa_and_templates(
                 str(result_dir.joinpath(jobname)),
                 use_env,
                 use_pairing=True,
+                pairing_strategy=pairing_strategy,
                 host_url=host_url,
             )
         else:
@@ -1028,7 +1037,7 @@ def generate_input_feature(
 
         # bugfix
         a3m_lines = f">0\n{full_sequence}\n"
-        a3m_lines += pair_msa(query_seqs_unique, query_seqs_cardinality, paired_msa, unpaired_msa)        
+        a3m_lines += pair_msa(query_seqs_unique, query_seqs_cardinality, paired_msa, unpaired_msa)
 
         input_feature = build_monomer_feature(full_sequence, a3m_lines, mk_mock_template(full_sequence))
         input_feature["residue_index"] = np.concatenate([np.arange(L) for L in Ls])
@@ -1049,7 +1058,7 @@ def generate_input_feature(
         chain_cnt = 0
         # for each unique sequence
         for sequence_index, sequence in enumerate(query_seqs_unique):
-            
+
             # get unpaired msa
             if unpaired_msa is None:
                 input_msa = f">{101 + sequence_index}\n{sequence}"
@@ -1230,6 +1239,7 @@ def run(
     keep_existing_results: bool = True,
     rank_by: str = "auto",
     pair_mode: str = "unpaired_paired",
+    pairing_strategy: str = "greedy",
     data_dir: Union[str, Path] = default_data_dir,
     host_url: str = DEFAULT_API_SERVER,
     random_seed: int = 0,
@@ -1306,7 +1316,7 @@ def run(
     if max_msa is not None:
         max_seq, max_extra_seq = [int(x) for x in max_msa.split(":")]
 
-    if kwargs.pop("use_amber", False) and num_relax == 0: 
+    if kwargs.pop("use_amber", False) and num_relax == 0:
         num_relax = num_models * num_seeds
 
     if len(kwargs) > 0:
@@ -1326,14 +1336,14 @@ def run(
         L = len("".join(query_sequence))
         if L > max_len: max_len = L
         if N > max_num: max_num = N
-    
+
     # get max sequences
     # 512 5120 = alphafold_ptm (models 1,3,4)
     # 512 1024 = alphafold_ptm (models 2,5)
     # 508 2048 = alphafold-multimer_v3 (models 1,2,3)
     # 508 1152 = alphafold-multimer_v3 (models 4,5)
     # 252 1152 = alphafold-multimer_v[1,2]
-    
+
     set_if = lambda x,y: y if x is None else x
     if model_type in ["alphafold2_multimer_v1","alphafold2_multimer_v2"]:
         (max_seq, max_extra_seq) = (set_if(max_seq,252), set_if(max_extra_seq,1152))
@@ -1341,7 +1351,7 @@ def run(
         (max_seq, max_extra_seq) = (set_if(max_seq,508), set_if(max_extra_seq,2048))
     else:
         (max_seq, max_extra_seq) = (set_if(max_seq,512), set_if(max_extra_seq,5120))
-    
+
     if msa_mode == "single_sequence":
         num_seqs = 1
         if is_complex and "multimer" not in model_type: num_seqs += max_num
@@ -1369,6 +1379,7 @@ def run(
         "max_seq": max_seq,
         "max_extra_seq": max_extra_seq,
         "pair_mode": pair_mode,
+        "pairing_strategy": pairing_strategy,
         "host_url": host_url,
         "stop_at_score": stop_at_score,
         "random_seed": random_seed,
@@ -1401,7 +1412,7 @@ def run(
     first_job = True
     for job_number, (raw_jobname, query_sequence, a3m_lines) in enumerate(queries):
         jobname = safe_filename(raw_jobname)
-        
+
         #######################################
         # check if job has already finished
         #######################################
@@ -1423,23 +1434,27 @@ def run(
         # generate MSA (a3m_lines) and templates
         ###########################################
         try:
-            if use_templates or a3m_lines is None:
+            if a3m_lines is None:
                 (unpaired_msa, paired_msa, query_seqs_unique, query_seqs_cardinality, template_features) \
-                = get_msa_and_templates(jobname, query_sequence, result_dir, msa_mode, use_templates, 
-                    custom_template_path, pair_mode, host_url)
-            if a3m_lines is not None:
-                (unpaired_msa, paired_msa, query_seqs_unique, query_seqs_cardinality, template_features_) \
+                = get_msa_and_templates(jobname, query_sequence, a3m_lines, result_dir, msa_mode, use_templates,
+                    custom_template_path, pair_mode, pairing_strategy, host_url)
+
+            elif a3m_lines is not None:
+                (unpaired_msa, paired_msa, query_seqs_unique, query_seqs_cardinality, template_features) \
                 = unserialize_msa(a3m_lines, query_sequence)
-                if not use_templates: template_features = template_features_
+                if use_templates:
+                    (_, _, _, _, template_features) \
+                        = get_msa_and_templates(jobname, query_seqs_unique, a3m_lines, result_dir, 'single_sequence', use_templates,
+                            custom_template_path, pair_mode, pairing_strategy, host_url)
 
             # save a3m
             msa = msa_to_str(unpaired_msa, paired_msa, query_seqs_unique, query_seqs_cardinality)
             result_dir.joinpath(f"{jobname}.a3m").write_text(msa)
-                
+
         except Exception as e:
             logger.exception(f"Could not get MSA/templates for {jobname}: {e}")
             continue
-        
+
         #######################
         # generate features
         #######################
@@ -1447,23 +1462,23 @@ def run(
             (feature_dict, domain_names) \
             = generate_input_feature(query_seqs_unique, query_seqs_cardinality, unpaired_msa, paired_msa,
                                      template_features, is_complex, model_type, max_seq=max_seq)
-            
+
             # to allow display of MSA info during colab/chimera run (thanks tomgoddard)
             if feature_dict_callback is not None:
                 feature_dict_callback(feature_dict)
-        
+
         except Exception as e:
             logger.exception(f"Could not generate input features {jobname}: {e}")
             continue
-        
+
         ######################
         # predict structures
         ######################
         try:
             # get list of lengths
-            query_sequence_len_array = sum([[len(x)] * y 
+            query_sequence_len_array = sum([[len(x)] * y
                 for x,y in zip(query_seqs_unique, query_seqs_cardinality)],[])
-            
+
             # decide how much to pad (to avoid recompiling)
             if seq_len > pad_len:
                 if isinstance(recompile_padding, float):
@@ -1471,7 +1486,7 @@ def run(
                 else:
                     pad_len = seq_len + recompile_padding
                 pad_len = min(pad_len, max_len)
-                            
+
             # prep model and params
             if first_job:
                 # if one job input adjust max settings
@@ -1483,7 +1498,7 @@ def run(
                         num_seqs = int(len(feature_dict["msa"]))
 
                     if use_templates: num_seqs += 4
-                    
+
                     # adjust max settings
                     max_seq = min(num_seqs, max_seq)
                     max_extra_seq = max(min(num_seqs - max_seq, max_extra_seq), 1)
@@ -1560,7 +1575,7 @@ def run(
             scores_file = result_dir.joinpath(f"{jobname}_scores_{r}.json")
             with scores_file.open("r") as handle:
                 scores.append(json.load(handle))
-        
+
         # write alphafold-db format (pAE)
         if "pae" in scores[0]:
           af_pae_file = result_dir.joinpath(f"{jobname}_predicted_aligned_error_v1.json")
@@ -1597,7 +1612,7 @@ def run(
             with zipfile.ZipFile(result_zip, "w") as result_zip:
                 for file in result_files:
                     result_zip.write(file, arcname=file.name)
-            
+
             # Delete only after the zip was successful, and also not the bibtex and config because we need those again
             for file in result_files[:-2]:
                 file.unlink()
@@ -1801,7 +1816,7 @@ def main():
     parser.add_argument("--bugfix", default=False, action="store_true")
 
     args = parser.parse_args()
-    
+
     # disable unified memory
     if args.disable_unified_memory:
         for k in ENV.keys():
@@ -1820,7 +1835,7 @@ def main():
 
     queries, is_complex = get_queries(args.input, args.sort_queries_by)
     model_type = set_model_type(is_complex, args.model_type)
-        
+
     download_alphafold_params(model_type, data_dir)
 
     if args.msa_mode != "single_sequence" and not args.templates:
