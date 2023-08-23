@@ -1,4 +1,4 @@
-# ColabFold for Protein-CyclicPeptide Docking (WIP)
+# ColabFold for Protein-CyclicPeptide Docking
 
 This repository is based on the ColabFold on [GitHub](https://github.com/sokrypton/ColabFold/tree/main).
 
