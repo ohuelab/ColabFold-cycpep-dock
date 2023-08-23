@@ -1,6 +1,8 @@
 # ColabFold for Protein-CyclicPeptide Docking (WIP)
 
 ```diff
++ 31Jul2023: 2023/07/31: The ColabFold MSA server is back to normal
++            It was using older DB (UniRef30 2202/PDB70 220313) from 27th ~8:30 AM CEST to 31st ~11:10 AM CEST.
 + 12Jun2023: New databases! UniRef30 updated to 2302 and PDB to 230517.
 +            We now use PDB100 instead of PDB70 (see notes in the [main](https://colabfold.com) notebook).
 + 12Jun2023: We introduced a new default pairing strategy:
