@@ -438,15 +438,15 @@ def predict_structure(
                                 c_offset = cyclic_offset(sequences_lengths[1])
                             logger.info(c_offset)
                             offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
-                            input_features["offset"] = np.tile(offset[None],(batch_size,1,1))
+                            input_features["offset"] = np.tile(offset[None],(r,1,1))
                         else:
                             if bugfix:
                                 logger.info("bugfix default cyclic offset")
-                                input_features["offset"] = np.tile(cyclic_offset(seq_len, bug_fix=bugfix)[None],(batch_size,1,1))
+                                input_features["offset"] = np.tile(cyclic_offset(seq_len, bug_fix=bugfix)[None],(r,1,1))
                                 logger.info(cyclic_offset(seq_len, bug_fix=bugfix))
                             else:
                                 logger.info("default cyclic offset")
-                                input_features["offset"] = np.tile(cyclic_offset(seq_len)[None],(batch_size,1,1))
+                                input_features["offset"] = np.tile(cyclic_offset(seq_len)[None],(r,1,1))
                                 logger.info(cyclic_offset(seq_len))
 
 
