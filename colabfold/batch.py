@@ -409,7 +409,9 @@ def predict_structure(
                     input_features["asym_id"] = input_features["asym_id"] - input_features["asym_id"][...,0]
                     if cyclic:
                         idx = input_features["residue_index"]
+                        logger.info(f"before extend: {idx}")
                         idx = index_extend(idx, sequences_lengths[1])
+                        logger.info(f"after extend: {idx}")
                         offset = np.array(idx[:,None] - idx[None,:])
                         if bugfix:
                             logger.info("bugfix mulitimer cyclic complex offset")
@@ -434,7 +436,9 @@ def predict_structure(
                     if cyclic:
                         if is_complex:
                             idx = input_features["residue_index"][0]
+                            logger.info(f"before extend: {idx}")
                             idx = index_extend(idx, sequences_lengths[1])
+                            logger.info(f"after extend: {idx}")
                             offset = np.array(idx[:,None] - idx[None,:])
                             if bugfix:
                                 logger.info("bugfix cyclic complex offset")
