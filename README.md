@@ -2,7 +2,11 @@
 
 This repository is based on the ColabFold on [GitHub](https://github.com/sokrypton/ColabFold/tree/main).
 
-## Protein-Cyclic Peptide Complex Prediction
+### Protein-Cyclic Peptide Complex Prediction
+
+![github_complex_predicition](https://github.com/ohuelab/ColabFold-cycpep-dock/assets/7370243/51adbc75-b03c-4c0e-a1b4-b417a8ff0a43)
+
+Green shows the predicted structure of the PDB target protein, cyan shows the predicted structure of target protein by using AlphaFold-Multimer model, and magenta shows the predicted structure of cyclic peptide by using AlphaFold-Multimer model.
 
 ### Google Colab
 
