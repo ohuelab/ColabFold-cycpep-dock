@@ -399,8 +399,8 @@ def predict_structure(
                 return np.sign(offset) * c_offset
 
             # for complex residue_index
-            def index_extend(idx, binder_len, length=50):
-                idx[-binder_len:] = idx[-binder_len:] + length - 1
+            def index_extend(idx, binder_len, target_len, length=50):
+                idx[-binder_len:] = idx[-binder_len:] + idx[target_len - 1] + length
                 return idx
 
             if "multimer" in model_type:
@@ -409,7 +409,7 @@ def predict_structure(
                     input_features["asym_id"] = input_features["asym_id"] - input_features["asym_id"][...,0]
                     if cyclic:
                         idx = input_features["residue_index"]
-                        idx = index_extend(idx, sequences_lengths[1])
+                        idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
                         offset = np.array(idx[:,None] - idx[None,:])
                         if bugfix:
                             logger.info("bugfix mulitimer cyclic complex offset")
@@ -434,7 +434,7 @@ def predict_structure(
                     if cyclic:
                         if is_complex:
                             idx = input_features["residue_index"][0]
-                            idx = index_extend(idx, sequences_lengths[1])
+                            idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
                             offset = np.array(idx[:,None] - idx[None,:])
                             if bugfix:
                                 logger.info("bugfix cyclic complex offset")
