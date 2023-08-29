@@ -71,6 +71,11 @@ from Bio.PDB.PDBIO import Select
 
 # logging settings
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - \n%(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 import jax
 import jax.numpy as jnp
 logging.getLogger('jax._src.lib.xla_bridge').addFilter(lambda _: False)
@@ -355,6 +360,9 @@ def predict_structure(
     save_recycles: bool = False,
     cyclic: bool = False,
     bugfix: bool = False,
+    highfold: bool = False,
+    cys_start: List[int] = [],
+    cys_end: List[int] = [],
 ):
     """Predicts structure using AlphaFold for the given sequence."""
 
@@ -392,6 +400,26 @@ def predict_structure(
             def index_extend(idx, binder_len, target_len, length=50):
                 idx[-binder_len:] = idx[-binder_len:] + idx[target_len - 1] + length
                 return idx
+            
+            def FCP(seq_lenth, c1, c2):
+                v = np.arange(seq_lenth)
+                M = np.full((len(v), len(v)), np.inf)  # initialize M with infinity values
+                for i in v:
+                    M[i][i] = 0
+                for i in v[:-1]:
+                    M[i][i+1] = 1
+                    M[i+1][i] = 1
+                M[0][seq_lenth - 1] = 1
+                M[seq_lenth - 1][0] = 1
+                for i, j in zip(c1, c2):
+                    M[i][j] = 1
+                    M[j][i] = 1
+                for k in v:
+                    for i in v:
+                        for j in v:
+                            if M[i][k] + M[k][j] < M[i][j]:
+                                M[i][j] = M[i][k] + M[k][j]
+                return M
 
             if "multimer" in model_type:
                 if model_num == 0 and seed_num == 0:
@@ -407,6 +435,15 @@ def predict_structure(
                         else:
                             logger.info("mulitimer cyclic complex offset")
                             c_offset = cyclic_offset(sequences_lengths[1])
+                        logger.info(c_offset)
+                        offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
+                        input_features["offset"] = offset
+                    if highfold:
+                        idx = input_features["residue_index"]
+                        idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
+                        offset = np.array(idx[:,None] - idx[None,:])
+                        c_offset = FCP(sequences_lengths[1], cys_start, cys_end)
+                        logger.info(f"mulitimer cyclic complex Highfold offset")
                         logger.info(c_offset)
                         offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
                         input_features["offset"] = offset
@@ -441,13 +478,29 @@ def predict_structure(
                             input_features["offset"] = np.tile(offset[None],(r,1,1))
                         else:
                             if bugfix:
-                                logger.info("bugfix default cyclic offset")
+                                logger.info("bugfix monomer cyclic offset")
                                 input_features["offset"] = np.tile(cyclic_offset(seq_len, bug_fix=bugfix)[None],(r,1,1))
                                 logger.info(cyclic_offset(seq_len, bug_fix=bugfix))
                             else:
-                                logger.info("default cyclic offset")
+                                logger.info("monomer cyclic offset")
                                 input_features["offset"] = np.tile(cyclic_offset(seq_len)[None],(r,1,1))
                                 logger.info(cyclic_offset(seq_len))
+                    if highfold:
+                        if is_complex:
+                            idx = input_features["residue_index"][0]
+                            idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
+                            offset = np.array(idx[:,None] - idx[None,:])
+                            logger.info("cyclic complex Highfold offset")
+                            c_offset = FCP(sequences_lengths[1], cys_start, cys_end)
+                            logger.info(c_offset)
+                            offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
+                            input_features["offset"] = np.tile(offset[None],(r,1,1))
+                        else:
+                            logger.info("monomer cyclic Highfold offset")
+                            c_offset = FCP(seq_len, cys_start, cys_end)
+                            logger.info(c_offset)
+                            input_features["offset"] = np.tile(c_offset[None],(r,1,1))
+                            logger.info(c_offset)
 
 
             tag = f"{model_type}_{model_name}_seed_{seed:03d}"
@@ -1261,6 +1314,9 @@ def run(
     feature_dict_callback: Callable[[Any], Any] = None,
     cyclic: bool = False,
     bugfix: bool = False,
+    highfold: bool = False,
+    cys_start: List[int] = [],
+    cys_end: List[int] = [],
     **kwargs
 ):
     # check what device is available
@@ -1393,6 +1449,10 @@ def run(
         "version": importlib_metadata.version("colabfold"),
         "cyclic":cyclic,
         "bugfix":bugfix,
+        "highfold":highfold,
+        "cys_start":cys_start,
+        "cys_end":cys_start,
+
     }
     config_out_file = result_dir.joinpath("config.json")
     config_out_file.write_text(json.dumps(config, indent=4))
@@ -1548,6 +1608,9 @@ def run(
                 save_recycles=save_recycles,
                 cyclic=cyclic,
                 bugfix=bugfix,
+                highfold=highfold,
+                cys_start=cys_start,
+                cys_end=cys_end,
             )
             result_files = results["result_files"]
             ranks.append(results["rank"])
@@ -1814,6 +1877,9 @@ def main():
     )
     parser.add_argument("--cyclic", default=False, action="store_true")
     parser.add_argument("--bugfix", default=False, action="store_true")
+    parser.add_argument("--highfold", default=False, action="store_true")
+    parser.add_argument("--cys_start", nargs='*', default=[], type=int, help="list of cys_start index")
+    parser.add_argument("--cys_end", nargs='*', default=[], type=int, help="list of cys_end index")
 
     args = parser.parse_args()
 
@@ -1887,6 +1953,9 @@ def main():
         save_recycles=args.save_recycles,
         cyclic=args.cyclic,
         bugfix=args.bugfix,
+        highfold=args.highfold,
+        cys_start=args.cys_start,
+        cys_end=args.cys_end,
     )
 
 if __name__ == "__main__":
