@@ -10,7 +10,7 @@ Green shows the predicted structure of the PDB target protein, cyan shows the pr
 
 ## Google Colab
 
-<a href="https://colab.research.google.com/github/ohuelab/ColabFold-cycpep-dock/blob/colab/AlphaFold2-cycpep-dock.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+<a href="https://colab.research.google.com/github/ohuelab/ColabFold-cycpep-dock/blob/highfold/AlphaFold2-cycpep-dock.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 ## How do I predict protein-cyclic peptide complexes?
 
