@@ -10,8 +10,6 @@ Green shows the predicted structure of the PDB target protein, cyan shows the pr
 
 ## Google Colab
 
-### Now, execution by Colab is not possible, and the bug is being fixed. Please use [localcolabfold](https://github.com/YoshitakaMo/localcolabfold). If you install localcolabfold with [install_colabbatch_linux.sh](https://github.com/ohuelab/ColabFold-cycpep-dock/blob/colab/install_colabbatch_linux.sh), you can use cyclic peptide complex offset can be installed in the cyclic_peptide_complex_offset_bugfix branch of this repository and can use cyclic peptide complex offset.
-
 <a href="https://colab.research.google.com/github/ohuelab/ColabFold-cycpep-dock/blob/colab/AlphaFold2-cycpep-dock.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 ## How do I predict protein-cyclic peptide complexes?
