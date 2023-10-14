@@ -1040,8 +1040,8 @@ def generate_input_feature(
     template_features: List[Dict[str, Any]],
     is_complex: bool,
     model_type: str,
-    max_seq: int,
     asym: bool,
+    max_seq: int,
 ) -> Tuple[Dict[str, Any], Dict[str, str]]:
 
     input_feature = {}
@@ -1063,7 +1063,10 @@ def generate_input_feature(
         input_feature["residue_index"] = np.concatenate([np.arange(L) for L in Ls])
         # Set asym_id in the is_complex option condition only when explicitly setting asym flag.
         if asym:
+            logger.info(f"asym_id setting is {asym}")
             input_feature["asym_id"] = np.concatenate([np.full(L,n) for n,L in enumerate(Ls)])
+        else:
+            logger.info(f"asym_id setting is {asym}")
         if any(
             [
                 template != b"none"
@@ -1486,8 +1489,11 @@ def run(
         #######################
         try:
             (feature_dict, domain_names) \
-            = generate_input_feature(query_seqs_unique, query_seqs_cardinality, unpaired_msa, paired_msa,
-                                     template_features, is_complex, model_type, max_seq=max_seq)
+            = generate_input_feature(query_seqs_unique, query_seqs_cardinality,
+                                     unpaired_msa, paired_msa,
+                                     template_features, is_complex, model_type,
+                                     asym,
+                                     max_seq=max_seq,)
 
             # to allow display of MSA info during colab/chimera run (thanks tomgoddard)
             if feature_dict_callback is not None:
