@@ -1840,7 +1840,7 @@ def main():
     )
     parser.add_argument("--cyclic", default=False, action="store_true")
     parser.add_argument("--bugfix", default=False, action="store_true")
-    parser.add_argument("--gap", default=False, action="store_true")
+    parser.add_argument("--gap", type=int, default=50, help="The number of gap length")
     parser.add_argument("--asym", default=False, action="store_true")
 
     args = parser.parse_args()
