@@ -1041,7 +1041,7 @@ def generate_input_feature(
     is_complex: bool,
     model_type: str,
     max_seq: int,
-    asym; bool,
+    asym: bool,
 ) -> Tuple[Dict[str, Any], Dict[str, str]]:
 
     input_feature = {}
