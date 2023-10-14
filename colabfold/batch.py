@@ -355,6 +355,7 @@ def predict_structure(
     save_recycles: bool = False,
     cyclic: bool = False,
     bugfix: bool = False,
+    gap: int = 50,
 ):
     """Predicts structure using AlphaFold for the given sequence."""
 
@@ -389,8 +390,8 @@ def predict_structure(
                 return np.sign(offset) * c_offset
 
             # for complex residue_index
-            def index_extend(idx, binder_len, target_len, length=50):
-                idx[-binder_len:] = idx[-binder_len:] + idx[target_len - 1] + length
+            def index_extend(idx, binder_len, target_len, gap_length=50):
+                idx[-binder_len:] = idx[-binder_len:] + idx[target_len - 1] + gap_length
                 return idx
 
             if "multimer" in model_type:
@@ -399,7 +400,7 @@ def predict_structure(
                     input_features["asym_id"] = input_features["asym_id"] - input_features["asym_id"][...,0]
                     if cyclic:
                         idx = input_features["residue_index"]
-                        idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
+                        idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0], gap)
                         offset = np.array(idx[:,None] - idx[None,:])
                         if bugfix:
                             logger.info("bugfix mulitimer cyclic complex offset")
@@ -410,6 +411,14 @@ def predict_structure(
                         logger.info(c_offset)
                         offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
                         input_features["offset"] = offset
+                    # without cyclic option but with gap residue index
+                    else:
+                        logger.info("The cyclic option is not used. Normal multimer setting, but with gap extend for residue_index.")
+                        idx = input_features["residue_index"]
+                        idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0], gap)
+                        offset = np.array(idx[:,None] - idx[None,:])
+                        input_features["offset"] = offset
+
 
                     # TODO: add support for multimer padding
                     # if seq_len < pad_len:
@@ -428,7 +437,7 @@ def predict_structure(
                     if cyclic:
                         if is_complex:
                             idx = input_features["residue_index"][0]
-                            idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
+                            idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0], gap)
                             offset = np.array(idx[:,None] - idx[None,:])
                             if bugfix:
                                 logger.info("bugfix cyclic complex offset")
@@ -448,7 +457,15 @@ def predict_structure(
                                 logger.info("default cyclic offset")
                                 input_features["offset"] = np.tile(cyclic_offset(seq_len)[None],(r,1,1))
                                 logger.info(cyclic_offset(seq_len))
-
+                    # without cyclic option
+                    else:
+                        if is_complex:
+                            logger.info("The cyclic option is not used. Normal AlphaFold setting, but for complexes, we will gap extend the residue_index.")
+                            idx = input_features["residue_index"][0]
+                            idx = index_extend(idx, sequences_lengths[1],
+                                            sequences_lengths[0], gap)
+                            offset = np.array(idx[:,None] - idx[None:])                   
+                            input_features["offset"] = np.tile(offset[None],(r,1,1))
 
             tag = f"{model_type}_{model_name}_seed_{seed:03d}"
             model_names.append(tag)
@@ -1261,6 +1278,7 @@ def run(
     feature_dict_callback: Callable[[Any], Any] = None,
     cyclic: bool = False,
     bugfix: bool = False,
+    gap: int = 50,
     **kwargs
 ):
     # check what device is available
@@ -1393,6 +1411,7 @@ def run(
         "version": importlib_metadata.version("colabfold"),
         "cyclic":cyclic,
         "bugfix":bugfix,
+        "gap": gap,
     }
     config_out_file = result_dir.joinpath("config.json")
     config_out_file.write_text(json.dumps(config, indent=4))
@@ -1548,6 +1567,7 @@ def run(
                 save_recycles=save_recycles,
                 cyclic=cyclic,
                 bugfix=bugfix,
+                gap=gap,
             )
             result_files = results["result_files"]
             ranks.append(results["rank"])
@@ -1814,6 +1834,7 @@ def main():
     )
     parser.add_argument("--cyclic", default=False, action="store_true")
     parser.add_argument("--bugfix", default=False, action="store_true")
+    parser.add_argument("--gap", default=False, action="store_true")
 
     args = parser.parse_args()
 
@@ -1887,6 +1908,7 @@ def main():
         save_recycles=args.save_recycles,
         cyclic=args.cyclic,
         bugfix=args.bugfix,
+        gap=args.gap,
     )
 
 if __name__ == "__main__":
