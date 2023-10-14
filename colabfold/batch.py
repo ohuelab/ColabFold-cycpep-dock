@@ -1041,6 +1041,7 @@ def generate_input_feature(
     is_complex: bool,
     model_type: str,
     max_seq: int,
+    asym; bool,
 ) -> Tuple[Dict[str, Any], Dict[str, str]]:
 
     input_feature = {}
@@ -1060,6 +1061,7 @@ def generate_input_feature(
 
         input_feature = build_monomer_feature(full_sequence, a3m_lines, mk_mock_template(full_sequence))
         input_feature["residue_index"] = np.concatenate([np.arange(L) for L in Ls])
+        # Set asym_id in the is_complex option condition only when explicitly setting asym flag.
         if asym:
             input_feature["asym_id"] = np.concatenate([np.full(L,n) for n,L in enumerate(Ls)])
         if any(
