@@ -431,7 +431,9 @@ def predict_structure(
                 if model_num == 0:
                     input_features = model_runner.process_features(feature_dict, random_seed=seed)
                     r = input_features["aatype"].shape[0]
-                    input_features["asym_id"] = np.tile(feature_dict["asym_id"],r).reshape(r,-1)
+                    if asym:
+                        logger.info(f"asym setting is {asym} for offset setting")
+                        input_features["asym_id"] = np.tile(feature_dict["asym_id"],r).reshape(r,-1)
                     if seq_len < pad_len:
                         input_features = pad_input(input_features, model_runner,
                             model_name, pad_len, use_templates)
