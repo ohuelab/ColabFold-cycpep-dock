@@ -431,9 +431,7 @@ def predict_structure(
                 if model_num == 0:
                     input_features = model_runner.process_features(feature_dict, random_seed=seed)
                     r = input_features["aatype"].shape[0]
-                    if asym:
-                        logger.info(f"asym setting is {asym} for offset setting")
-                        input_features["asym_id"] = np.tile(feature_dict["asym_id"],r).reshape(r,-1)
+                    input_features["asym_id"] = np.tile(feature_dict["asym_id"],r).reshape(r,-1)
                     if seq_len < pad_len:
                         input_features = pad_input(input_features, model_runner,
                             model_name, pad_len, use_templates)
@@ -1063,12 +1061,7 @@ def generate_input_feature(
 
         input_feature = build_monomer_feature(full_sequence, a3m_lines, mk_mock_template(full_sequence))
         input_feature["residue_index"] = np.concatenate([np.arange(L) for L in Ls])
-        # Set asym_id in the is_complex option condition only when explicitly setting asym flag.
-        if asym:
-            logger.info(f"asym_id setting is {asym}")
-            input_feature["asym_id"] = np.concatenate([np.full(L,n) for n,L in enumerate(Ls)])
-        else:
-            logger.info(f"asym_id setting is {asym}")
+        input_feature["asym_id"] = np.concatenate([np.full(L,n) for n,L in enumerate(Ls)])
         if any(
             [
                 template != b"none"
