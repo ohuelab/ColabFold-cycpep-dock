@@ -356,6 +356,7 @@ def predict_structure(
     cyclic: bool = False,
     bugfix: bool = False,
     gap: int = 50,
+    asym: bool = False,
 ):
     """Predicts structure using AlphaFold for the given sequence."""
 
@@ -1059,7 +1060,8 @@ def generate_input_feature(
 
         input_feature = build_monomer_feature(full_sequence, a3m_lines, mk_mock_template(full_sequence))
         input_feature["residue_index"] = np.concatenate([np.arange(L) for L in Ls])
-        input_feature["asym_id"] = np.concatenate([np.full(L,n) for n,L in enumerate(Ls)])
+        if asym:
+            input_feature["asym_id"] = np.concatenate([np.full(L,n) for n,L in enumerate(Ls)])
         if any(
             [
                 template != b"none"
@@ -1280,6 +1282,7 @@ def run(
     cyclic: bool = False,
     bugfix: bool = False,
     gap: int = 50,
+    asym: bool = False,
     **kwargs
 ):
     # check what device is available
@@ -1413,6 +1416,7 @@ def run(
         "cyclic":cyclic,
         "bugfix":bugfix,
         "gap": gap,
+        "asym": asym,
     }
     config_out_file = result_dir.joinpath("config.json")
     config_out_file.write_text(json.dumps(config, indent=4))
@@ -1569,6 +1573,7 @@ def run(
                 cyclic=cyclic,
                 bugfix=bugfix,
                 gap=gap,
+                asym=asym,
             )
             result_files = results["result_files"]
             ranks.append(results["rank"])
@@ -1836,6 +1841,7 @@ def main():
     parser.add_argument("--cyclic", default=False, action="store_true")
     parser.add_argument("--bugfix", default=False, action="store_true")
     parser.add_argument("--gap", default=False, action="store_true")
+    parser.add_argument("--asym", default=False, action="store_true")
 
     args = parser.parse_args()
 
@@ -1910,6 +1916,7 @@ def main():
         cyclic=args.cyclic,
         bugfix=args.bugfix,
         gap=args.gap,
+        asym=args.asym,
     )
 
 if __name__ == "__main__":
