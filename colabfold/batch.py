@@ -392,6 +392,7 @@ def predict_structure(
             # for complex residue_index
             def index_extend(idx, binder_len, target_len, gap_length=50):
                 idx[-binder_len:] = idx[-binder_len:] + idx[target_len - 1] + gap_length
+                logger.info(f"gap setting is {gap}")
                 return idx
 
             if "multimer" in model_type:
