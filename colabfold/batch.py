@@ -432,8 +432,11 @@ def predict_structure(
                         idx = input_features["residue_index"]
                         idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
                         offset = np.array(idx[:,None] - idx[None,:])
-                        offset = invert_offset(offset, type=invert_type)
-                        logger.info(offset)
+                        i_idx = idx[-sequences_lengths[1]:]
+                        i_offset = np.array(i_idx[:,None] - i_idx[None,:])
+                        offset = invert_offset(i_offset, type=invert_type)
+                        logger.info(i_offset)
+                        offset[sequences_lengths[0]:,sequences_lengths[0]:] = i_offset
                         input_features["offset"] = offset
 
                     # TODO: add support for multimer padding
@@ -482,9 +485,11 @@ def predict_structure(
                             idx = index_extend(idx, sequences_lengths[1],
                                             sequences_lengths[0])
                             offset = np.array(idx[:,None] - idx[None:])
-                            # TODO not multimer model and complex mode invert_type
-                            if invert_type != None:
-                                logger.info("Under setting. Now can not use invert_type")
+                            i_idx = idx[-sequences_lengths[1]:]
+                            i_offset = np.array(i_idx[:,None] - i_idx[None,:])
+                            offset = invert_offset(i_offset, type=invert_type)
+                            logger.info(i_offset)
+                            offset[sequences_lengths[0]:,sequences_lengths[0]:] = i_offset
                             input_features["offset"] = np.tile(offset[None],(r,1,1))
                         else:
                             logger.info("The cyclic option is not used. It is not using mutimer model and monomer mode")
