@@ -434,7 +434,7 @@ def predict_structure(
                         offset = np.array(idx[:,None] - idx[None,:])
                         i_idx = idx[-sequences_lengths[1]:]
                         i_offset = np.array(i_idx[:,None] - i_idx[None,:])
-                        offset = invert_offset(i_offset, type=invert_type)
+                        i_offset = invert_offset(i_offset, type=invert_type)
                         logger.info(i_offset)
                         offset[sequences_lengths[0]:,sequences_lengths[0]:] = i_offset
                         input_features["offset"] = offset
@@ -487,7 +487,7 @@ def predict_structure(
                             offset = np.array(idx[:,None] - idx[None:])
                             i_idx = idx[-sequences_lengths[1]:]
                             i_offset = np.array(i_idx[:,None] - i_idx[None,:])
-                            offset = invert_offset(i_offset, type=invert_type)
+                            i_offset = invert_offset(i_offset, type=invert_type)
                             logger.info(i_offset)
                             offset[sequences_lengths[0]:,sequences_lengths[0]:] = i_offset
                             input_features["offset"] = np.tile(offset[None],(r,1,1))
