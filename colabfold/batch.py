@@ -392,17 +392,20 @@ def predict_structure(
             def invert_offset(offset, type=None):
                 if type == "invert":
                     logger.info(f"invert_type is {type}")
-                    i_offset = offset[::-1,::-1]
+                    offset = offset[::-1,::-1]
                 elif type == "positive":
                     logger.info(f"invert_type is {type}")
-                    i_offset *= np.sign(np.arange(len(offset))[:,None] - np.arange(len(offset))[None,:])
+                    offset *= np.sign(np.arange(len(offset))[:,None] - np.arange(len(offset))[None,:])
                 elif type == "negative":
                     logger.info(f"invert_type is {type}")
-                    i_offset *= -np.sign(np.arange(len(offset))[:,None] - np.arange(len(offset))[None,:])
+                    offset *= -np.sign(np.arange(len(offset))[:,None] - np.arange(len(offset))[None,:])
+                elif type == None:
+                    logger.info(f"invert_type is default")
+                    return offset
                 else:
                     logger.info(f"invert_type is {type}")
-                    i_offset = offset
-                return i_offset
+                    exit()
+                return offset
 
             # for complex residue_index
             def index_extend(idx, binder_len, target_len, length=50):
