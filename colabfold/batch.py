@@ -392,16 +392,17 @@ def predict_structure(
             def invert_offset(offset, type=None):
                 if type == "invert":
                     logger.info(f"invert_type is {type}")
-                    offset = offset[::-1,::-1]
+                    i_offset = offset[::-1,::-1]
                 elif type == "positive":
                     logger.info(f"invert_type is {type}")
-                    offset *= np.sign(np.arange(len(offset))[:,None] - np.arange(len(offset))[None,:])
+                    i_offset *= np.sign(np.arange(len(offset))[:,None] - np.arange(len(offset))[None,:])
                 elif type == "negative":
                     logger.info(f"invert_type is {type}")
-                    offset *= -np.sign(np.arange(len(offset))[:,None] - np.arange(len(offset))[None,:])
+                    i_offset *= -np.sign(np.arange(len(offset))[:,None] - np.arange(len(offset))[None,:])
                 else:
                     logger.info(f"invert_type is {type}")
-                return offset
+                    i_offset = offset
+                return i_offset
 
             # for complex residue_index
             def index_extend(idx, binder_len, target_len, length=50):
@@ -422,9 +423,9 @@ def predict_structure(
                         else:
                             logger.info("mulitimer cyclic complex offset")
                             c_offset = cyclic_offset(sequences_lengths[1])
-                        c_offset = invert_offset(c_offset, type=invert_type)
-                        logger.info(c_offset)
-                        offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
+                        i_offset = invert_offset(c_offset, type=invert_type)
+                        logger.info(i_offset)
+                        offset[sequences_lengths[0]:,sequences_lengths[0]:] = i_offset
                         input_features["offset"] = offset
                     # without cyclic option
                     else:
@@ -433,8 +434,8 @@ def predict_structure(
                         idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
                         offset = np.array(idx[:,None] - idx[None,:])
                         i_idx = idx[-sequences_lengths[1]:]
-                        i_offset = np.array(i_idx[:,None] - i_idx[None,:])
-                        i_offset = invert_offset(i_offset, type=invert_type)
+                        c_offset = np.array(i_idx[:,None] - i_idx[None,:])
+                        i_offset = invert_offset(c_offset, type=invert_type)
                         logger.info(i_offset)
                         offset[sequences_lengths[0]:,sequences_lengths[0]:] = i_offset
                         input_features["offset"] = offset
@@ -464,19 +465,19 @@ def predict_structure(
                             else:
                                 logger.info("cyclic complex offset")
                                 c_offset = cyclic_offset(sequences_lengths[1])
-                            c_offset = invert_offset(c_offset, type=invert_type)
-                            logger.info(c_offset)
-                            offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
+                            i_offset = invert_offset(c_offset, type=invert_type)
+                            logger.info(i_offset)
+                            offset[sequences_lengths[0]:,sequences_lengths[0]:] = i_offset
                             input_features["offset"] = np.tile(offset[None],(r,1,1))
                         else:
                             if bugfix:
                                 logger.info("bugfix default cyclic offset")
                             else:
                                 logger.info("default cyclic offset")
-                            offset = np.tile(cyclic_offset(seq_len, bug_fix=bugfix)[None],(r,1,1))
-
-                            input_features["offset"] = offset
-                            logger.info(cyclic_offset(seq_len))
+                            c_offset = cyclic_offset(seq_len, bug_fix=bugfix)
+                            i_offset = invert_offset(c_offset, type=invert_type)
+                            logger.info(i_offset)
+                            input_features["offset"] = np.tile(i_offset[None],(r,1,1))
                     # without cyclic option
                     else:
                         if is_complex:
@@ -486,8 +487,8 @@ def predict_structure(
                                             sequences_lengths[0])
                             offset = np.array(idx[:,None] - idx[None:])
                             i_idx = idx[-sequences_lengths[1]:]
-                            i_offset = np.array(i_idx[:,None] - i_idx[None,:])
-                            i_offset = invert_offset(i_offset, type=invert_type)
+                            c_offset = np.array(i_idx[:,None] - i_idx[None,:])
+                            i_offset = invert_offset(c_offset, type=invert_type)
                             logger.info(i_offset)
                             offset[sequences_lengths[0]:,sequences_lengths[0]:] = i_offset
                             input_features["offset"] = np.tile(offset[None],(r,1,1))
@@ -495,9 +496,9 @@ def predict_structure(
                             logger.info("The cyclic option is not used. It is not using mutimer model and monomer mode")
                             idx = input_features["residue_index"][0]
                             offset = np.array(idx[:,None] - idx[None:])
-                            offset = invert_offset(offset, type=invert_type)
-                            logger.info(f"{offset}")
-                            input_features["offset"] = np.tile(offset[None],(r,1,1))
+                            i_offset = invert_offset(offset, type=invert_type)
+                            logger.info(f"{i_offset}")
+                            input_features["offset"] = np.tile(i_offset[None],(r,1,1))
 
             tag = f"{model_type}_{model_name}_seed_{seed:03d}"
             model_names.append(tag)
