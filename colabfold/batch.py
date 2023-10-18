@@ -355,6 +355,7 @@ def predict_structure(
     save_recycles: bool = False,
     cyclic: bool = False,
     bugfix: bool = False,
+    invert_type: str = None,
 ):
     """Predicts structure using AlphaFold for the given sequence."""
 
@@ -388,6 +389,20 @@ def predict_structure(
                     c_offset[a] = -c_offset[a]
                 return np.sign(offset) * c_offset
 
+            def invert_offset(offset, type=None):
+                if type == "invert":
+                    logger.info(f"invert_type is {type}")
+                    offset = offset[::-1,::-1]
+                elif type == "positive":
+                    logger.info(f"invert_type is {type}")
+                    offset *= np.sign(np.arange(len(offset))[:,None] - np.arange(len(offset))[None,:])
+                elif type == "negative":
+                    logger.info(f"invert_type is {type}")
+                    offset *= -np.sign(np.arange(len(offset))[:,None] - np.arange(len(offset))[None,:])
+                else:
+                    logger.info(f"invert_type is {type}")
+                return offset
+
             # for complex residue_index
             def index_extend(idx, binder_len, target_len, length=50):
                 idx[-binder_len:] = idx[-binder_len:] + idx[target_len - 1] + length
@@ -407,8 +422,18 @@ def predict_structure(
                         else:
                             logger.info("mulitimer cyclic complex offset")
                             c_offset = cyclic_offset(sequences_lengths[1])
+                        c_offset = invert_offset(c_offset, type=invert_type)
                         logger.info(c_offset)
                         offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
+                        input_features["offset"] = offset
+                    # without cyclic option
+                    else:
+                        logger.info("The cyclic option is not used.")
+                        idx = input_features["residue_index"]
+                        idx = index_extend(idx, sequences_lengths[1], sequences_lengths[0])
+                        offset = np.array(idx[:,None] - idx[None,:])
+                        offset = invert_offset(offset, type=invert_type)
+                        logger.info(offset)
                         input_features["offset"] = offset
 
                     # TODO: add support for multimer padding
@@ -436,19 +461,38 @@ def predict_structure(
                             else:
                                 logger.info("cyclic complex offset")
                                 c_offset = cyclic_offset(sequences_lengths[1])
+                            c_offset = invert_offset(c_offset, type=invert_type)
                             logger.info(c_offset)
                             offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
                             input_features["offset"] = np.tile(offset[None],(r,1,1))
                         else:
                             if bugfix:
                                 logger.info("bugfix default cyclic offset")
-                                input_features["offset"] = np.tile(cyclic_offset(seq_len, bug_fix=bugfix)[None],(r,1,1))
-                                logger.info(cyclic_offset(seq_len, bug_fix=bugfix))
                             else:
                                 logger.info("default cyclic offset")
-                                input_features["offset"] = np.tile(cyclic_offset(seq_len)[None],(r,1,1))
-                                logger.info(cyclic_offset(seq_len))
+                            offset = np.tile(cyclic_offset(seq_len, bug_fix=bugfix)[None],(r,1,1))
 
+                            input_features["offset"] = offset
+                            logger.info(cyclic_offset(seq_len))
+                    # without cyclic option
+                    else:
+                        if is_complex:
+                            logger.info("The cyclic option is not used. It is not using multimer model, but complex mode")
+                            idx = input_features["residue_index"][0]
+                            idx = index_extend(idx, sequences_lengths[1],
+                                            sequences_lengths[0])
+                            offset = np.array(idx[:,None] - idx[None:])
+                            # TODO not multimer model and complex mode invert_type
+                            if invert_type != None:
+                                logger.info("Under setting. Now can not use invert_type")
+                            input_features["offset"] = np.tile(offset[None],(r,1,1))
+                        else:
+                            logger.info("The cyclic option is not used. It is not using mutimer model and monomer mode")
+                            idx = input_features["residue_index"][0]
+                            offset = np.array(idx[:,None] - idx[None:])
+                            offset = invert_offset(offset, type=invert_type)
+                            logger.info(f"{offset}")
+                            input_features["offset"] = np.tile(offset[None],(r,1,1))
 
             tag = f"{model_type}_{model_name}_seed_{seed:03d}"
             model_names.append(tag)
@@ -1261,6 +1305,7 @@ def run(
     feature_dict_callback: Callable[[Any], Any] = None,
     cyclic: bool = False,
     bugfix: bool = False,
+    invert_type: str = None,
     **kwargs
 ):
     # check what device is available
@@ -1393,6 +1438,7 @@ def run(
         "version": importlib_metadata.version("colabfold"),
         "cyclic":cyclic,
         "bugfix":bugfix,
+        "invert_type": invert_type,
     }
     config_out_file = result_dir.joinpath("config.json")
     config_out_file.write_text(json.dumps(config, indent=4))
@@ -1548,6 +1594,7 @@ def run(
                 save_recycles=save_recycles,
                 cyclic=cyclic,
                 bugfix=bugfix,
+                invert_type=invert_type,
             )
             result_files = results["result_files"]
             ranks.append(results["rank"])
@@ -1814,7 +1861,17 @@ def main():
     )
     parser.add_argument("--cyclic", default=False, action="store_true")
     parser.add_argument("--bugfix", default=False, action="store_true")
-
+    parser.add_argument("--inver_type",
+        help="Invert type for offset. if complex mode, apply latter protein",
+        type=str,
+        default=None,
+        choices=[
+            None,
+            "invert",
+            "positive",
+            "negative",
+        ],
+    )
     args = parser.parse_args()
 
     # disable unified memory
@@ -1887,6 +1944,7 @@ def main():
         save_recycles=args.save_recycles,
         cyclic=args.cyclic,
         bugfix=args.bugfix,
+        invert_type=args.invert_type,
     )
 
 if __name__ == "__main__":
