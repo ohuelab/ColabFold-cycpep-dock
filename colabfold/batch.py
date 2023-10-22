@@ -379,7 +379,7 @@ def predict_structure(
             #########################
             # process input features
             #########################
-            def cyclic_offset(L, bug_fix=False, even=None):
+            def cyclic_offset(L, bug_fix=False, even=even):
                 i = np.arange(L)
                 ij = np.stack([i,i+L],-1)
                 offset = i[:,None] - i[None,:]
