@@ -355,7 +355,7 @@ def predict_structure(
     save_recycles: bool = False,
     cyclic: bool = False,
     bugfix: bool = False,
-    even: str = "positive",
+    even_type: str = "positive",
 ):
     """Predicts structure using AlphaFold for the given sequence."""
 
@@ -379,7 +379,7 @@ def predict_structure(
             #########################
             # process input features
             #########################
-            def cyclic_offset(L, bug_fix=False, even=even):
+            def cyclic_offset(L, bug_fix=False, even=even_type):
                 i = np.arange(L)
                 ij = np.stack([i,i+L],-1)
                 offset = i[:,None] - i[None,:]
@@ -388,12 +388,17 @@ def predict_structure(
                     a = c_offset < np.abs(offset)
                     c_offset[a] = -c_offset[a]
                     c_offset *= np.sign(offset)
+                    logger.info(f"even:{even}")
                     if even == "positive" and L % 2 == 0:
                         logger.info(f"The length of this offset is even and sets the asymmetric upper right corner to a positive value.")
                         c_offset[c_offset == -L//2] = L//2
+                        logger.info(f"even:{even}")
+                        logger.info(f"{c_offset}")
                     elif even == "negative" and L % 2 == 0:
                         logger.info(f"The length of this offset is even and sets the asymmetric lower left corner to a negative value.")
                         c_offset[c_offset == L//2] = -L//2
+                        logger.info(f"even:{even}")
+                        logger.info(f"{c_offset}")
                 return c_offset
 
             # for complex residue_index
@@ -1269,7 +1274,7 @@ def run(
     feature_dict_callback: Callable[[Any], Any] = None,
     cyclic: bool = False,
     bugfix: bool = False,
-    even: str = "positive",
+    even_type: str = "positive",
     **kwargs
 ):
     # check what device is available
@@ -1402,7 +1407,7 @@ def run(
         "version": importlib_metadata.version("colabfold"),
         "cyclic":cyclic,
         "bugfix":bugfix,
-        "even":even,
+        "even_type":even_type,
     }
     config_out_file = result_dir.joinpath("config.json")
     config_out_file.write_text(json.dumps(config, indent=4))
@@ -1558,7 +1563,7 @@ def run(
                 save_recycles=save_recycles,
                 cyclic=cyclic,
                 bugfix=bugfix,
-                even=even,
+                even_type=even_type,
             )
             result_files = results["result_files"]
             ranks.append(results["rank"])
@@ -1825,7 +1830,7 @@ def main():
     )
     parser.add_argument("--cyclic", default=False, action="store_true")
     parser.add_argument("--bugfix", default=False, action="store_true")
-    parser.add_argument("--even",
+    parser.add_argument("--even_type",
         help="If the length of this offset is even, align the values of the top and bottom corners with positive or negative values",
         type=str,
         default="positive",
@@ -1907,7 +1912,7 @@ def main():
         save_recycles=args.save_recycles,
         cyclic=args.cyclic,
         bugfix=args.bugfix,
-        even=args.even,
+        even_type=args.even_type,
     )
 
 if __name__ == "__main__":
