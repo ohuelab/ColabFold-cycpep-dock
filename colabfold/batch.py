@@ -378,7 +378,7 @@ def predict_structure(
             #########################
             # process input features
             #########################
-            def cyclic_offset(L, bug_fix=False):
+            def cyclic_offset(L, bug_fix=False, odd=None):
                 i = np.arange(L)
                 ij = np.stack([i,i+L],-1)
                 offset = i[:,None] - i[None,:]
@@ -386,7 +386,14 @@ def predict_structure(
                 if bug_fix:
                     a = c_offset < np.abs(offset)
                     c_offset[a] = -c_offset[a]
-                return np.sign(offset) * c_offset
+                    c_offset *= np.sign(offset)
+                    if odd == "positive" and L % 2 == 0:
+                        logger.info(f"The length of this offset is odd and sets the asymmetric upper right corner to a positive value.")
+                        c_offset[c_offset == -L//2] = L//2
+                    elif odd == "negative" and L % 2 == 0:
+                        logger.info(f"The length of this offset is odd and sets the asymmetric lower left corner to a negative value.")
+                        c_offset[c_offset == L//2] = -L//2
+                return c_offset
 
             # for complex residue_index
             def index_extend(idx, binder_len, target_len, length=50):
