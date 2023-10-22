@@ -355,7 +355,7 @@ def predict_structure(
     save_recycles: bool = False,
     cyclic: bool = False,
     bugfix: bool = False,
-    even_type: str = "positive",
+    even_type: str = None,
 ):
     """Predicts structure using AlphaFold for the given sequence."""
 
