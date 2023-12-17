@@ -1870,7 +1870,7 @@ def main():
     )
     parser.add_argument("--cyclic", default=False, action="store_true")
     parser.add_argument("--bugfix", default=False, action="store_true")
-    parser.add_argument("--inver_type",
+    parser.add_argument("--invert_type",
         help="Invert type for offset. if complex mode, apply latter protein",
         type=str,
         default=None,
