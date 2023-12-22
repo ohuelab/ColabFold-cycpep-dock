@@ -399,6 +399,8 @@ def predict_structure(
                         c_offset[c_offset == L//2] = -L//2
                         logger.info(f"even:{even}")
                         logger.info(f"{c_offset}")
+                else:
+                    c_offset *= np.sign(offset)
                 return c_offset
 
             # for complex residue_index
