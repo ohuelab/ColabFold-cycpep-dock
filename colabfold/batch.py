@@ -404,13 +404,10 @@ def predict_structure(
     save_single_representations: bool = False,
     save_pair_representations: bool = False,
     save_recycles: bool = False,
-<<<<<<< HEAD
     cyclic: bool = False,
     bugfix: bool = False,
-=======
     calc_extra_ptm: bool = False,
     use_probs_extra: bool = True,
->>>>>>> upstream/main
 ):
     """Predicts structure using AlphaFold for the given sequence."""
     mean_scores = []
@@ -1277,15 +1274,12 @@ def run(
     local_pdb_path: Optional[Path] = None,
     use_cluster_profile: bool = True,
     feature_dict_callback: Callable[[Any], Any] = None,
-<<<<<<< HEAD
     cyclic: bool = False,
     bugfix: bool = False,
-=======
     calc_extra_ptm: bool = False,
     use_probs_extra: bool = True,
     max_template_date: str = "2100-01-01",
     max_template_hits: int = 20,
->>>>>>> upstream/main
     **kwargs
 ):
     # check what device is available
@@ -1420,15 +1414,12 @@ def run(
         "use_fuse": use_fuse,
         "use_bfloat16": use_bfloat16,
         "version": importlib_metadata.version("colabfold"),
-<<<<<<< HEAD
         "cyclic":cyclic,
         "bugfix":bugfix,
-=======
         "calc_extra_ptm": calc_extra_ptm,
         "use_probs_extra": use_probs_extra,
         "max_template_date": max_template_date,
         "max_template_hits": max_template_hits,
->>>>>>> upstream/main
     }
     config_out_file = result_dir.joinpath("config.json")
     config_out_file.write_text(json.dumps(config, indent=4))
@@ -1548,7 +1539,6 @@ def run(
             logger.exception(f"Could not generate input features {jobname}: {e}")
             continue
 
-<<<<<<< HEAD
         ######################
         # predict structures
         ######################
@@ -1636,8 +1626,6 @@ def run(
             logger.error(f"Could not predict {jobname}. Not Enough GPU memory? {e}")
             continue
 
-=======
->>>>>>> upstream/main
         ###############
         # save plots not requiring prediction
         ###############
