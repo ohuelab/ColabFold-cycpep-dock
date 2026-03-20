@@ -1578,6 +1578,7 @@ def run(
                     num_recycles=num_recycles,
                     num_ensemble=num_ensemble,
                     model_order=model_order,
+                    model_type=model_type,
                     data_dir=data_dir,
                     stop_at_score=stop_at_score,
                     rank_by=rank_by,
