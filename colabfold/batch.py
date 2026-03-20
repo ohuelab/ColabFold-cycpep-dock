@@ -2396,15 +2396,12 @@ def main():
         jobname_prefix=args.jobname_prefix,
         save_all=args.save_all,
         save_recycles=args.save_recycles,
-<<<<<<< HEAD
         cyclic=args.cyclic,
         bugfix=args.bugfix,
-=======
         calc_extra_ptm=args.calc_extra_ptm,
         use_probs_extra=use_probs_extra,
         max_template_date=args.max_template_date,
         max_template_hits=args.max_template_hits,
->>>>>>> upstream/main
     )
 
 if __name__ == "__main__":
