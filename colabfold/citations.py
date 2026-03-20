@@ -89,7 +89,7 @@ pmid = {27899574},
 title = {{Uniclust databases of clustered and deeply annotated protein sequences and alignments}},
 volume = {45},
 year = {2017},
-comment = {Uniclust30/UniRef30 database},
+comment = {Uniclust30/UniRef30 database}
 }""",
     "Berman2003": """@misc{Berman2003,
 author = {Berman, Helen and Henrick, Kim and Nakamura, Haruki},
@@ -103,6 +103,19 @@ volume = {10},
 year = {2003},
 comment = {templates downloaded from wwPDB server}
 }""",
+    "Lee2023": """@article{Lee2023,
+author = {Lee, Jae-Won and Won, Jong-Hyun and Jeon, Seonggwang and Choo, Yujin and Yeon, Yubin and Oh, Jin-Seon and Kim, Minsoo and Kim, SeonHwa and Joung, InSuk and Jang, Cheongjae and Lee, Sung Jong and Kim, Tae Hyun and Jin, Kyong Hwan and Song, Giltae and Kim, Eun-Sol and Yoo, Jejoong and Paek, Eunok and Noh, Yung-Kyun and Joo, Keehyoung},
+title = "{DeepFold: enhancing protein structure prediction through optimized loss functions, improved template features, and re-optimized energy function}",
+journal = {Bioinformatics},
+volume = {39},
+number = {12},
+pages = {btad712},
+year = {2023},
+month = {11},
+doi = {10.1093/bioinformatics/btad712},
+comment = {DeepFold-v1 Model}
+}
+""",
 }
 
 
@@ -116,9 +129,11 @@ def write_bibtex(
     bibtex_file: str = "cite.bibtex",
 ) -> Path:
     to_cite = ["Mirdita2021"]
-    if model == "AlphaFold2-ptm":
+    if model == "alphafold2_ptm" or model == "alphafold2":
         to_cite += ["Jumper2021"]
-    if model.startswith("AlphaFold2-multimer"):
+    if model == "deepfold_v1":
+        to_cite += ["Lee2023"]
+    if model.startswith("alphafold2_multimer"):
         to_cite += ["Evans2021"]
     if use_msa:
         to_cite += ["Mirdita2019"]

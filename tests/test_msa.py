@@ -23,11 +23,13 @@ def test_get_msa_and_templates(pytestconfig, caplog, tmp_path):
             ) = get_msa_and_templates(
                 "test",
                 Q60262,
+                None,
                 tmp_path,
                 msa_mode,
                 False,
                 None,
                 "unpaired_paired",
+                "colabfold/test"
             )
 
         assert len(unpaired_msa[0].splitlines()) == lines

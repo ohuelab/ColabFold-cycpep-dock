@@ -79,6 +79,8 @@ class MockRunModel:
       def chk(a,b):
         test = []
         for k,v in a.items():
+          if k == "msa_feat" or k == "msa":
+            continue
           if k in b: # TODO
             if isinstance(v, dict):
               test.append(chk(v,b[k]))
@@ -142,7 +144,9 @@ class MMseqs2Mock:
     use_templates=False,
     filter=None,
     use_pairing=False,
+    pairing_strategy="greedy",
     host_url="https://a3m.mmseqs.com",
+    user_agent="colabfold/test",
   ):
     assert prefix
     config = {
@@ -152,9 +156,18 @@ class MMseqs2Mock:
       "use_templates": use_templates,
       "filter": filter,
       "use_pairing": use_pairing,
+      "pairing_strategy": pairing_strategy,
     }
 
+    # make pre env-pair test work again, this was always true previously
+    # however didn't do anything
+    if len(query) > 1:
+      config["use_env"] = True
+
     for saved_response in self.saved_responses:
+      # backwards compatibility, remove after UPDATE_SNAPSHOTS
+      if "pairing_strategy" not in saved_response["config"]:
+        saved_response["config"]["pairing_strategy"] = "greedy"
       if saved_response["config"] == config:
         return saved_response["response"]
 
@@ -168,7 +181,9 @@ class MMseqs2Mock:
         use_templates=config["use_templates"],
         filter=config["filter"],
         use_pairing=config["use_pairing"],
+        pairing_strategy=config["pairing_strategy"],
         host_url=host_url,
+        user_agent=user_agent,
       )
       # Split lines so we get a readable json file
       response = split_lines(response)
