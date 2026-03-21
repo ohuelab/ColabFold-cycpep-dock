@@ -404,13 +404,10 @@ def predict_structure(
     save_single_representations: bool = False,
     save_pair_representations: bool = False,
     save_recycles: bool = False,
-<<<<<<< HEAD
     cyclic: bool = False,
     bugfix: bool = False,
-=======
     calc_extra_ptm: bool = False,
     use_probs_extra: bool = True,
->>>>>>> upstream/main
 ):
     """Predicts structure using AlphaFold for the given sequence."""
     mean_scores = []
@@ -462,7 +459,7 @@ def predict_structure(
                         else:
                             logger.info("mulitimer cyclic complex offset")
                             c_offset = cyclic_offset(sequences_lengths[1])
-                        logger.info(c_offset)
+                        logger.info(f"\n{c_offset}\n")
                         offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
                         input_features["offset"] = offset
 
@@ -491,18 +488,18 @@ def predict_structure(
                             else:
                                 logger.info("cyclic complex offset")
                                 c_offset = cyclic_offset(sequences_lengths[1])
-                            logger.info(c_offset)
+                            logger.info(f"\n{c_offset}\n")
                             offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
                             input_features["offset"] = np.tile(offset[None],(r,1,1))
                         else:
                             if bugfix:
                                 logger.info("bugfix default cyclic offset")
                                 input_features["offset"] = np.tile(cyclic_offset(seq_len, bug_fix=bugfix)[None],(r,1,1))
-                                logger.info(cyclic_offset(seq_len, bug_fix=bugfix))
+                                logger.info(f"\n{cyclic_offset(seq_len, bug_fix=bugfix)}\n")
                             else:
                                 logger.info("default cyclic offset")
                                 input_features["offset"] = np.tile(cyclic_offset(seq_len)[None],(r,1,1))
-                                logger.info(cyclic_offset(seq_len))
+                                logger.info(f"\n{cyclic_offset(seq_len)}\n")
 
 
             tag = f"{model_type}_{model_name}_seed_{seed:03d}"
@@ -1277,15 +1274,12 @@ def run(
     local_pdb_path: Optional[Path] = None,
     use_cluster_profile: bool = True,
     feature_dict_callback: Callable[[Any], Any] = None,
-<<<<<<< HEAD
     cyclic: bool = False,
     bugfix: bool = False,
-=======
     calc_extra_ptm: bool = False,
     use_probs_extra: bool = True,
     max_template_date: str = "2100-01-01",
     max_template_hits: int = 20,
->>>>>>> upstream/main
     **kwargs
 ):
     # check what device is available
@@ -1420,15 +1414,12 @@ def run(
         "use_fuse": use_fuse,
         "use_bfloat16": use_bfloat16,
         "version": importlib_metadata.version("colabfold"),
-<<<<<<< HEAD
         "cyclic":cyclic,
         "bugfix":bugfix,
-=======
         "calc_extra_ptm": calc_extra_ptm,
         "use_probs_extra": use_probs_extra,
         "max_template_date": max_template_date,
         "max_template_hits": max_template_hits,
->>>>>>> upstream/main
     }
     config_out_file = result_dir.joinpath("config.json")
     config_out_file.write_text(json.dumps(config, indent=4))
@@ -1548,96 +1539,6 @@ def run(
             logger.exception(f"Could not generate input features {jobname}: {e}")
             continue
 
-<<<<<<< HEAD
-        ######################
-        # predict structures
-        ######################
-        try:
-            # get list of lengths
-            query_sequence_len_array = sum([[len(x)] * y
-                for x,y in zip(query_seqs_unique, query_seqs_cardinality)],[])
-
-            # decide how much to pad (to avoid recompiling)
-            if seq_len > pad_len:
-                if isinstance(recompile_padding, float):
-                    pad_len = math.ceil(seq_len * recompile_padding)
-                else:
-                    pad_len = seq_len + recompile_padding
-                pad_len = min(pad_len, max_len)
-
-            # prep model and params
-            if first_job:
-                # if one job input adjust max settings
-                if len(queries) == 1 and msa_mode != "single_sequence":
-                    # get number of sequences
-                    if "msa_mask" in feature_dict:
-                        num_seqs = int(sum(feature_dict["msa_mask"].max(-1) == 1))
-                    else:
-                        num_seqs = int(len(feature_dict["msa"]))
-
-                    if use_templates: num_seqs += 4
-
-                    # adjust max settings
-                    max_seq = min(num_seqs, max_seq)
-                    max_extra_seq = max(min(num_seqs - max_seq, max_extra_seq), 1)
-                    logger.info(f"Setting max_seq={max_seq}, max_extra_seq={max_extra_seq}")
-
-                model_runner_and_params = load_models_and_params(
-                    num_models=num_models,
-                    use_templates=use_templates,
-                    num_recycles=num_recycles,
-                    num_ensemble=num_ensemble,
-                    model_order=model_order,
-                    model_suffix=model_suffix,
-                    data_dir=data_dir,
-                    stop_at_score=stop_at_score,
-                    rank_by=rank_by,
-                    use_dropout=use_dropout,
-                    max_seq=max_seq,
-                    max_extra_seq=max_extra_seq,
-                    use_cluster_profile=use_cluster_profile,
-                    recycle_early_stop_tolerance=recycle_early_stop_tolerance,
-                    use_fuse=use_fuse,
-                    use_bfloat16=use_bfloat16,
-                    save_all=save_all,
-                )
-                first_job = False
-
-            results = predict_structure(
-                prefix=jobname,
-                result_dir=result_dir,
-                feature_dict=feature_dict,
-                is_complex=is_complex,
-                use_templates=use_templates,
-                sequences_lengths=query_sequence_len_array,
-                pad_len=pad_len,
-                model_type=model_type,
-                model_runner_and_params=model_runner_and_params,
-                num_relax=num_relax,
-                rank_by=rank_by,
-                stop_at_score=stop_at_score,
-                prediction_callback=prediction_callback,
-                use_gpu_relax=use_gpu_relax,
-                random_seed=random_seed,
-                num_seeds=num_seeds,
-                save_all=save_all,
-                save_single_representations=save_single_representations,
-                save_pair_representations=save_pair_representations,
-                save_recycles=save_recycles,
-                cyclic=cyclic,
-                bugfix=bugfix,
-            )
-            result_files = results["result_files"]
-            ranks.append(results["rank"])
-            metrics.append(results["metric"])
-
-        except RuntimeError as e:
-            # This normally happens on OOM. TODO: Filter for the specific OOM error message
-            logger.error(f"Could not predict {jobname}. Not Enough GPU memory? {e}")
-            continue
-
-=======
->>>>>>> upstream/main
         ###############
         # save plots not requiring prediction
         ###############
@@ -1743,6 +1644,8 @@ def run(
                     save_single_representations=save_single_representations,
                     save_pair_representations=save_pair_representations,
                     save_recycles=save_recycles,
+                    cyclic=cyclic,
+                    bugfix=bugfix,
                     calc_extra_ptm=calc_extra_ptm,
                     use_probs_extra=use_probs_extra,
                 )
@@ -2408,15 +2311,12 @@ def main():
         jobname_prefix=args.jobname_prefix,
         save_all=args.save_all,
         save_recycles=args.save_recycles,
-<<<<<<< HEAD
         cyclic=args.cyclic,
         bugfix=args.bugfix,
-=======
         calc_extra_ptm=args.calc_extra_ptm,
         use_probs_extra=use_probs_extra,
         max_template_date=args.max_template_date,
         max_template_hits=args.max_template_hits,
->>>>>>> upstream/main
     )
 
 if __name__ == "__main__":
