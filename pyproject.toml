@@ -25,7 +25,7 @@ jax = { version = "^0.5.2", optional = true }
 matplotlib = "^3.8.4"
 tensorflow-cpu = { version = "^2.16.2", markers = "platform_machine != 'aarch64' and platform_machine != 'arm64'", optional = true }
 tensorflow = { version = "^2.16.2", markers = "platform_machine == 'aarch64' or platform_machine == 'arm64'", optional = true }
-biopython = "<1.86"
+biopython = "==1.79"
 numpy = "^2.0.2"
 pandas = "^2.2.2"
 #alphafold-colabfold = { version = "2.3.13", optional = true }
