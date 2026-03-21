@@ -1539,6 +1539,29 @@ def run(
             logger.exception(f"Could not generate input features {jobname}: {e}")
             continue
 
+        ###############
+        # save plots not requiring prediction
+        ###############
+
+        result_files = []
+
+        # make msa plot
+        if not 'plots' in skip_output:
+            from colabfold.plot import plot_msa_v2
+            msa_plot = plot_msa_v2(feature_dict, dpi=dpi)
+            coverage_png = result_dir.joinpath(f"{jobname}_coverage.png")
+            msa_plot.savefig(str(coverage_png), bbox_inches='tight')
+            msa_plot.close()
+            result_files.append(coverage_png)
+
+        if use_templates:
+            templates_file = result_dir.joinpath(f"{jobname}_template_domain_names.json")
+            templates_file.write_text(json.dumps(domain_names))
+            result_files.append(templates_file)
+
+        result_files.append(result_dir.joinpath(jobname + ".a3m"))
+        result_files += [bibtex_file, config_out_file]
+
         ######################
         # predict structures
         ######################
