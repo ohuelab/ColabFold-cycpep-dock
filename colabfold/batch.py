@@ -398,7 +398,7 @@ def predict_structure(
     random_seed: int = 0,
     num_seeds: int = 1,
     stop_at_score: float = 100,
-    prediction_callback: Callable[[Any, Any, Any, Any, Any], Any] = None,
+    prediction_callback: Callable[[Any, Any, Any, Any, Any, bool], Any] = None,
     use_gpu_relax: bool = False,
     save_all: bool = False,
     save_single_representations: bool = False,
@@ -595,7 +595,7 @@ def predict_structure(
             # callback for visualization
             if prediction_callback is not None:
                 prediction_callback(unrelaxed_protein, sequences_lengths,
-                                    result, input_features, (tag, False))
+                                    result, input_features, (tag, False), cyclic)
 
             #########################
             # save results
@@ -1257,7 +1257,7 @@ def run(
     num_seeds: int = 1,
     recompile_padding: Union[int, float] = 10,
     zip_results: bool = False,
-    prediction_callback: Callable[[Any, Any, Any, Any, Any], Any] = None,
+    prediction_callback: Callable[[Any, Any, Any, Any, Any, bool], Any] = None,
     save_single_representations: bool = False,
     save_pair_representations: bool = False,
     skip_output: List[str] = [],
