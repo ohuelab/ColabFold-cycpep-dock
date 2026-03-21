@@ -1614,6 +1614,8 @@ def run(
                         use_fuse=use_fuse,
                         use_bfloat16=use_bfloat16,
                         save_all=save_all,
+                        cyclic=cyclic,
+                        bugfix=bugfix,
                         calc_extra_ptm=calc_extra_ptm
                     )
                     first_job = False
