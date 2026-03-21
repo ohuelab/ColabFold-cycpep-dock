@@ -459,7 +459,7 @@ def predict_structure(
                         else:
                             logger.info("mulitimer cyclic complex offset")
                             c_offset = cyclic_offset(sequences_lengths[1])
-                        logger.info(c_offset)
+                        logger.info(f"\n{c_offset}\n")
                         offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
                         input_features["offset"] = offset
 
@@ -488,18 +488,18 @@ def predict_structure(
                             else:
                                 logger.info("cyclic complex offset")
                                 c_offset = cyclic_offset(sequences_lengths[1])
-                            logger.info(c_offset)
+                            logger.info(f"\n{c_offset}\n")
                             offset[sequences_lengths[0]:,sequences_lengths[0]:] = c_offset
                             input_features["offset"] = np.tile(offset[None],(r,1,1))
                         else:
                             if bugfix:
                                 logger.info("bugfix default cyclic offset")
                                 input_features["offset"] = np.tile(cyclic_offset(seq_len, bug_fix=bugfix)[None],(r,1,1))
-                                logger.info(cyclic_offset(seq_len, bug_fix=bugfix))
+                                logger.info(f"\n{cyclic_offset(seq_len, bug_fix=bugfix)}\n")
                             else:
                                 logger.info("default cyclic offset")
                                 input_features["offset"] = np.tile(cyclic_offset(seq_len)[None],(r,1,1))
-                                logger.info(cyclic_offset(seq_len))
+                                logger.info(f"\n{cyclic_offset(seq_len)}\n")
 
 
             tag = f"{model_type}_{model_name}_seed_{seed:03d}"
@@ -1542,116 +1542,6 @@ def run(
         ######################
         # predict structures
         ######################
-        try:
-            # get list of lengths
-            query_sequence_len_array = sum([[len(x)] * y
-                for x,y in zip(query_seqs_unique, query_seqs_cardinality)],[])
-
-            # decide how much to pad (to avoid recompiling)
-            if seq_len > pad_len:
-                if isinstance(recompile_padding, float):
-                    pad_len = math.ceil(seq_len * recompile_padding)
-                else:
-                    pad_len = seq_len + recompile_padding
-                pad_len = min(pad_len, max_len)
-
-            # prep model and params
-            if first_job:
-                # if one job input adjust max settings
-                if len(queries) == 1 and msa_mode != "single_sequence":
-                    # get number of sequences
-                    if "msa_mask" in feature_dict:
-                        num_seqs = int(sum(feature_dict["msa_mask"].max(-1) == 1))
-                    else:
-                        num_seqs = int(len(feature_dict["msa"]))
-
-                    if use_templates: num_seqs += 4
-
-                    # adjust max settings
-                    max_seq = min(num_seqs, max_seq)
-                    max_extra_seq = max(min(num_seqs - max_seq, max_extra_seq), 1)
-                    logger.info(f"Setting max_seq={max_seq}, max_extra_seq={max_extra_seq}")
-
-                model_runner_and_params = load_models_and_params(
-                    num_models=num_models,
-                    use_templates=use_templates,
-                    num_recycles=num_recycles,
-                    num_ensemble=num_ensemble,
-                    model_order=model_order,
-                    model_type=model_type,
-                    data_dir=data_dir,
-                    stop_at_score=stop_at_score,
-                    rank_by=rank_by,
-                    use_dropout=use_dropout,
-                    max_seq=max_seq,
-                    max_extra_seq=max_extra_seq,
-                    use_cluster_profile=use_cluster_profile,
-                    recycle_early_stop_tolerance=recycle_early_stop_tolerance,
-                    use_fuse=use_fuse,
-                    use_bfloat16=use_bfloat16,
-                    save_all=save_all,
-                )
-                first_job = False
-
-            results = predict_structure(
-                prefix=jobname,
-                result_dir=result_dir,
-                feature_dict=feature_dict,
-                is_complex=is_complex,
-                use_templates=use_templates,
-                sequences_lengths=query_sequence_len_array,
-                pad_len=pad_len,
-                model_type=model_type,
-                model_runner_and_params=model_runner_and_params,
-                num_relax=num_relax,
-                rank_by=rank_by,
-                stop_at_score=stop_at_score,
-                prediction_callback=prediction_callback,
-                use_gpu_relax=use_gpu_relax,
-                random_seed=random_seed,
-                num_seeds=num_seeds,
-                save_all=save_all,
-                save_single_representations=save_single_representations,
-                save_pair_representations=save_pair_representations,
-                save_recycles=save_recycles,
-                cyclic=cyclic,
-                bugfix=bugfix,
-            )
-            result_files = results["result_files"]
-            ranks.append(results["rank"])
-            metrics.append(results["metric"])
-
-        except RuntimeError as e:
-            # This normally happens on OOM. TODO: Filter for the specific OOM error message
-            logger.error(f"Could not predict {jobname}. Not Enough GPU memory? {e}")
-            continue
-
-        ###############
-        # save plots not requiring prediction
-        ###############
-
-        result_files = []
-
-        # make msa plot
-        if not 'plots' in skip_output:
-            from colabfold.plot import plot_msa_v2
-            msa_plot = plot_msa_v2(feature_dict, dpi=dpi)
-            coverage_png = result_dir.joinpath(f"{jobname}_coverage.png")
-            msa_plot.savefig(str(coverage_png), bbox_inches='tight')
-            msa_plot.close()
-            result_files.append(coverage_png)
-
-        if use_templates:
-            templates_file = result_dir.joinpath(f"{jobname}_template_domain_names.json")
-            templates_file.write_text(json.dumps(domain_names))
-            result_files.append(templates_file)
-
-        result_files.append(result_dir.joinpath(jobname + ".a3m"))
-        result_files += [bibtex_file, config_out_file]
-
-        ######################
-        # predict structures
-        ######################
         if num_models > 0:
             try:
                 # get list of lengths
@@ -1731,6 +1621,8 @@ def run(
                     save_single_representations=save_single_representations,
                     save_pair_representations=save_pair_representations,
                     save_recycles=save_recycles,
+                    cyclic=cyclic,
+                    bugfix=bugfix,
                     calc_extra_ptm=calc_extra_ptm,
                     use_probs_extra=use_probs_extra,
                 )
