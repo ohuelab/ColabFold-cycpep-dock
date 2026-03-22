@@ -679,7 +679,7 @@ def kabsch(a, b, weights=None, return_v=False):
 
 def plot_pseudo_3D(xyz, c=None, ax=None, chainbreak=5,
                    cmap="gist_rainbow", line_w=2.0,
-                   cmin=None, cmax=None, zmin=None, zmax=None):
+                   cmin=None, cmax=None, zmin=None, zmax=None, cyclic=False):
 
   def rescale(a,amin=None,amax=None):
     a = np.copy(a)
@@ -692,6 +692,9 @@ def plot_pseudo_3D(xyz, c=None, ax=None, chainbreak=5,
   # make segments
   xyz = np.asarray(xyz)
   seg = np.concatenate([xyz[:-1,None,:],xyz[1:,None,:]],axis=-2)
+  if cyclic:
+    # Add connection between N and C termini
+    seg = np.concatenate([seg, np.array([xyz[-1], xyz[0]])[None]], axis=0)
   seg_xy = seg[...,:2]
   seg_z = seg[...,2].mean(-1)
   ord = seg_z.argsort()
@@ -699,6 +702,9 @@ def plot_pseudo_3D(xyz, c=None, ax=None, chainbreak=5,
   # set colors
   if c is None: c = np.arange(len(seg))[::-1]
   else: c = (c[1:] + c[:-1])/2
+  if cyclic and len(c) == len(xyz):
+    # For cyclic proteins, add color for N-C connection
+    c = np.concatenate([c, [(c[0] + c[-1])/2]])
   c = rescale(c,cmin,cmax)  
 
   if isinstance(cmap, str):
@@ -709,11 +715,23 @@ def plot_pseudo_3D(xyz, c=None, ax=None, chainbreak=5,
   
   if chainbreak is not None:
     dist = np.linalg.norm(xyz[:-1] - xyz[1:], axis=-1)
+    if cyclic:
+      # Add distance for N-C connection
+      dist = np.concatenate([dist, [np.linalg.norm(xyz[-1] - xyz[0])]])
+      # Ensure colors array matches dist array length
+      if len(colors) < len(dist):
+        colors = np.concatenate([colors, [colors[-1]]])
+      # Ensure dist array matches colors array length
+      if len(dist) < len(colors):
+        dist = np.concatenate([dist, [dist[-1]]])
     colors[...,3] = (dist < chainbreak).astype(float)
 
   # add shade/tint based on z-dimension
-  z = rescale(seg_z,zmin,zmax)[:,None]
-  tint, shade = z/3, (z+2)/3
+  if cyclic and len(seg_z) < len(colors):
+    seg_z = np.concatenate([seg_z, [seg_z[-1]]])
+  z = rescale(seg_z,zmin,zmax)
+  tint = (z/3)[:,None]
+  shade = ((z+2)/3)[:,None]
   colors[:,:3] = colors[:,:3] + (1 - colors[:,:3]) * tint
   colors[:,:3] = colors[:,:3] * shade
 
@@ -750,7 +768,7 @@ def add_text(text, ax):
                   verticalalignment='bottom', transform=ax.transAxes)
 
 def plot_protein(protein=None, pos=None, plddt=None, Ls=None,
-                 dpi=100, best_view=True, line_w=2.0):
+                 dpi=100, best_view=True, line_w=2.0, cyclic=False):
   
   if protein is not None:
     pos = np.asarray(protein.atom_positions[:,1,:])
@@ -773,16 +791,16 @@ def plot_protein(protein=None, pos=None, plddt=None, Ls=None,
 
   if Ls is None or len(Ls) == 1:
     # color N->C
-    plot_protein_backbone(pos=pos, coloring='N-C', best_view=False, line_w=line_w, axes=ax1)
+    plot_protein_backbone(pos=pos, coloring='N-C', best_view=False, line_w=line_w, axes=ax1, cyclic=cyclic)
     add_text("colored by N→C", ax1)
   else:
     # color by chain
-    plot_protein_backbone(pos=pos, coloring='chain', best_view=False, Ls=Ls, line_w=line_w, axes=ax1)
+    plot_protein_backbone(pos=pos, coloring='chain', best_view=False, Ls=Ls, line_w=line_w, axes=ax1, cyclic=cyclic)
     add_text("colored by chain", ax1)
-    
+
   if plddt is not None:
     # color by pLDDT
-    plot_protein_backbone(pos=pos, coloring='plddt', best_view=False, plddt=plddt, line_w=line_w, axes=ax2)
+    plot_protein_backbone(pos=pos, coloring='plddt', best_view=False, plddt=plddt, Ls=Ls, line_w=line_w, axes=ax2, cyclic=cyclic)
     add_text("colored by pLDDT", ax2)
 
   return fig
@@ -799,7 +817,7 @@ def protein_best_view(pos, plddt=None):
 
 def plot_protein_backbone(protein=None, pos=None, plddt=None,
                           axes=None, coloring='plddt', Ls=None,
-                          best_view=True, line_w=2.0):
+                          best_view=True, line_w=2.0, cyclic=False):
   import numpy as np
   if protein is not None:
     if pos is None:
@@ -818,14 +836,67 @@ def plot_protein_backbone(protein=None, pos=None, plddt=None,
 
   if coloring == 'N-C':
     # color N->C
-    plot_pseudo_3D(pos,  line_w=line_w, ax=axes)
+    if cyclic and Ls is not None and len(Ls) > 1:
+      # For complexes, only make chainB cyclic
+      chainB_start = Ls[0]
+      chainB_end = chainB_start + Ls[1]
+      plot_pseudo_3D(pos[:chainB_start], line_w=line_w, ax=axes, cyclic=False)
+      plot_pseudo_3D(pos[chainB_start:chainB_end], line_w=line_w, ax=axes, cyclic=True)
+      if len(Ls) > 2:
+        plot_pseudo_3D(pos[chainB_end:], line_w=line_w, ax=axes, cyclic=False)
+    elif cyclic:
+      # For monomers, make chainA cyclic
+      plot_pseudo_3D(pos, line_w=line_w, ax=axes, cyclic=True)
+    else:
+      plot_pseudo_3D(pos, line_w=line_w, ax=axes, cyclic=False)
   elif coloring == 'plddt':
     # color by pLDDT
-    plot_pseudo_3D(pos, c=plddt, cmin=50, cmax=90, line_w=line_w, ax=axes)
+    if cyclic and Ls is not None and len(Ls) > 1:
+      # For complexes, only make chainB cyclic
+      chainB_start = Ls[0]
+      chainB_end = chainB_start + Ls[1]
+      # Plot chainA
+      plot_pseudo_3D(pos[:chainB_start], c=plddt[:chainB_start], cmin=50, cmax=90, line_w=line_w, ax=axes, cyclic=False)
+      # Plot chainB with cyclic connection
+      plddt_chainB = np.array(plddt[chainB_start:chainB_end])
+      plddt_chainB = np.concatenate([plddt_chainB, [(plddt_chainB[0] + plddt_chainB[-1])/2]])
+      plot_pseudo_3D(pos[chainB_start:chainB_end], c=plddt_chainB, cmin=50, cmax=90, line_w=line_w, ax=axes, cyclic=True)
+      # Plot remaining chains if any
+      if len(Ls) > 2:
+        plddt_chainB_end = np.array(plddt[chainB_end:])
+        plot_pseudo_3D(pos[chainB_end:], c=plddt[chainB_end:], cmin=50, cmax=90, line_w=line_w, ax=axes, cyclic=False)
+    elif cyclic and (Ls is None or len(Ls) == 1):
+      # For monomers only, make chainA cyclic
+      plddt_cyclic = np.concatenate([plddt, [(plddt[0] + plddt[-1])/2]])
+      plot_pseudo_3D(pos, c=plddt_cyclic, cmin=50, cmax=90, line_w=line_w, ax=axes, cyclic=True)
+    else:
+      plot_pseudo_3D(pos, c=plddt, cmin=50, cmax=90, line_w=line_w, ax=axes, cyclic=False)
   elif coloring == 'chain':
     # color by chain
     c = np.concatenate([[n]*L for n,L in enumerate(Ls)])
     nchain = len(Ls)
-    if nchain > 40:   plot_pseudo_3D(pos, c=c, line_w=line_w, ax=axes)
-    else:             plot_pseudo_3D(pos, c=c, cmap=pymol_cmap, cmin=0, cmax=39,
-                                     line_w=line_w, ax=axes)
+    if cyclic and nchain > 1:
+      # For complexes, only make chainB cyclic
+      chainB_start = Ls[0]
+      chainB_end = chainB_start + Ls[1]
+      if nchain > 40:
+        plot_pseudo_3D(pos[:chainB_start], c=c[:chainB_start], line_w=line_w, ax=axes, cyclic=False)
+        plot_pseudo_3D(pos[chainB_start:chainB_end], c=c[chainB_start:chainB_end], line_w=line_w, ax=axes, cyclic=True)
+        if len(Ls) > 2:
+          plot_pseudo_3D(pos[chainB_end:], c=c[chainB_end:], line_w=line_w, ax=axes, cyclic=False)
+      else:
+        plot_pseudo_3D(pos[:chainB_start], c=c[:chainB_start], cmap=pymol_cmap, cmin=0, cmax=39, line_w=line_w, ax=axes, cyclic=False)
+        plot_pseudo_3D(pos[chainB_start:chainB_end], c=c[chainB_start:chainB_end], cmap=pymol_cmap, cmin=0, cmax=39, line_w=line_w, ax=axes, cyclic=True)
+        if len(Ls) > 2:
+          plot_pseudo_3D(pos[chainB_end:], c=c[chainB_end:], cmap=pymol_cmap, cmin=0, cmax=39, line_w=line_w, ax=axes, cyclic=False)
+    elif cyclic:
+      # For monomers, make chainA cyclic
+      if nchain > 40:
+        plot_pseudo_3D(pos, c=c, line_w=line_w, ax=axes, cyclic=True)
+      else:
+        plot_pseudo_3D(pos, c=c, cmap=pymol_cmap, cmin=0, cmax=39, line_w=line_w, ax=axes, cyclic=True)
+    else:
+      if nchain > 40:
+        plot_pseudo_3D(pos, c=c, line_w=line_w, ax=axes, cyclic=False)
+      else:
+        plot_pseudo_3D(pos, c=c, cmap=pymol_cmap, cmin=0, cmax=39, line_w=line_w, ax=axes, cyclic=False)
